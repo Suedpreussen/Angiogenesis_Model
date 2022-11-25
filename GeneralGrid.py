@@ -53,6 +53,17 @@ def generate_graph(adjacent_matrix):
     edges_data = pd.DataFrame(edges_list)
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
+def generate_grid_graph(dim_A, dim_B):
+    graph = nx.grid_graph(dim=(dim_A, dim_B))
+    inc_mtx = nx.incidence_matrix(graph)
+    inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
+    inc_mtx_dense_int = inc_mtx_dense.astype(int)
+    nodes_list = graph.nodes()
+    edges_list = graph.edges()
+    nodes_data = pd.DataFrame(nodes_list)
+    edges_data = pd.DataFrame(edges_list)
+    return inc_mtx_dense_int, graph, nodes_data, edges_data
+
 
 def generate_physical_values(dimension, source_value, incidence_matrix):
     edges_dim = np.shape(incidence_matrix)[1]
@@ -73,9 +84,14 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list)  @ incidence_T
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
     # update data frames for both spaces
-    nodes_data.insert(loc=1, column='source', value=source_list)
-    nodes_data.columns = ['nodes', 'source']
-    nodes_data.insert(loc=2, column='pressure', value=pressure_list)
+    if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
+        nodes_data.insert(loc=1, column='source', value=source_list)
+        nodes_data.columns = ['nodes', 'source']
+        nodes_data.insert(loc=2, column='pressure', value=pressure_list)
+    elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
+        nodes_data.columns = ['no-', '-des']
+        nodes_data['source'] = source_list
+        nodes_data['pressure'] = pressure_list
     print(nodes_data)
     edges_data.columns = ['ed-', '-ges']
     edges_data['length'] = length_list
@@ -117,7 +133,7 @@ def run_simulation(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c
 
 
 def draw_graph(graph):
-    nx.draw(graph)
+    nx.draw_networkx(graph)
     plt.savefig("graph.png")
     # show nodes number
     # nodes colour - heatmap of pressure
@@ -125,12 +141,15 @@ def draw_graph(graph):
     # edges thickness - proportional to (conductivity)^(-4)
 
 
+
+
 if __name__ == '__main__':
     start_time = time.time()
 
-    number_of_nodes = 9
+    number_of_nodes = 6*6
     adjacency_matrix = generate_random_adjacent_matrix(number_of_nodes)
-    incidence_matrix, graph, nodes_data, edges_data = generate_graph(adjacency_matrix)
+    #incidence_matrix, graph, nodes_data, edges_data = generate_graph(adjacency_matrix)  # random graph
+    incidence_matrix, graph, nodes_data, edges_data = generate_grid_graph(6, 6)          # regular grid
     source_value = 5
     x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list = generate_physical_values(number_of_nodes, source_value, incidence_matrix)
     draw_graph(graph)
