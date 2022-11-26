@@ -41,7 +41,6 @@ def generate_random_adjacent_matrix(dimension):   # dimension == #nodes
             #print("Error: generated matrix has zero-valued elements only and thus can't represent a graph.")
 
 
-
 def generate_graph(adjacent_matrix):
     graph = nx.from_numpy_matrix(adjacent_matrix, parallel_edges=True)
     inc_mtx = nx.incidence_matrix(graph)
@@ -52,6 +51,7 @@ def generate_graph(adjacent_matrix):
     nodes_data = pd.DataFrame(nodes_list)
     edges_data = pd.DataFrame(edges_list)
     return inc_mtx_dense_int, graph, nodes_data, edges_data
+
 
 def generate_grid_graph(dim_A, dim_B):
     graph = nx.grid_graph(dim=(dim_A, dim_B))
@@ -83,6 +83,7 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list)  @ incidence_T
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
+
     # update data frames for both spaces
     if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
         nodes_data.insert(loc=1, column='source', value=source_list)
@@ -92,14 +93,42 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
         nodes_data.columns = ['no-', '-des']
         nodes_data['source'] = source_list
         nodes_data['pressure'] = pressure_list
-    print(nodes_data)
+    #print(nodes_data)
     edges_data.columns = ['ed-', '-ges']
     edges_data['length'] = length_list
     edges_data['conduct.'] = conductivity_list
     edges_data['flow'] = flow_list
     edges_data['press_diff'] = pressure_diff_list
-    print(edges_data)
+    #print(edges_data)
     return x_dagger, incidence_T, incidence_inv, source_list, pressure_list, length_list, conductivity_list, flow_list
+
+
+def set_attributes(graph, pressure_list):
+    colour_const = 2
+    list = []
+    print(list(graph.nodes))
+    print(list)
+
+
+
+
+    print(type(graph.nodes))
+    print(*graph.nodes, "sdfsdg")
+    node_attrs = []
+    for i in nodes_data.index:
+        inside = {(int(nodes_data.to_numpy()[i][0]), int(nodes_data.to_numpy()[i][1])): {"pressure": pressure_list[i], "colour": pressure_list[i] * colour_const}}
+        node_attrs.append(inside)
+    print("AAAA", node_attrs[0])
+    print((node_attrs))
+    name_one = 4
+    print(name_one, "sdgdfgfghfg")
+
+    # atrrr = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
+    node_attrs = {(0, 0): {"pressure": pressure_list[0], "colour": pressure_list[0]*colour_const}}
+    print(type(node_attrs))
+
+    nx.set_node_attributes(graph, node_attrs)
+    print(list(graph.nodes(data=True)))
 
 
 def run_simulation(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
@@ -127,33 +156,36 @@ def run_simulation(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c
     edges_data['conduct.'] = conductivity_list
     edges_data['flow'] = flow_list
     edges_data['press_diff'] = pressure_diff_list
-    print(edges_data)
+    #print(edges_data)
     nodes_data['pressure'] = pressure_list
-    print(nodes_data)
+    #print(nodes_data)
 
 
 def draw_graph(graph):
-    nx.draw_networkx(graph)
-    plt.savefig("graph.png")
-    # show nodes number
+    pass
+    #straight_lines = nx.multipartite_layout(graph)     # sets nodes in straight lines
+    #nx.draw_networkx(graph, pos=straight_lines)
+    #plt.savefig("graph.png")
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
+    # edges colour - proportional to flow
+    # edges arrows - in alignment with the sign of flow
     # edges thickness - proportional to (conductivity)^(-4)
-
-
-
+    # , node_color=range(24), node_size=800, cmap=plt.cm.Blues
 
 if __name__ == '__main__':
     start_time = time.time()
 
-    number_of_nodes = 6*6
+    n = 3
+    number_of_nodes = n*n
     adjacency_matrix = generate_random_adjacent_matrix(number_of_nodes)
     #incidence_matrix, graph, nodes_data, edges_data = generate_graph(adjacency_matrix)  # random graph
-    incidence_matrix, graph, nodes_data, edges_data = generate_grid_graph(6, 6)          # regular grid
+    incidence_matrix, graph, nodes_data, edges_data = generate_grid_graph(n, n)          # regular grid
     source_value = 5
     x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list = generate_physical_values(number_of_nodes, source_value, incidence_matrix)
-    draw_graph(graph)
+    set_attributes(graph, pressure_list)
+    #draw_graph(graph)
     parameters_set = {'a': 1.7, 'b': 0.5, 'gamma': 2/3, 'delta': 2.1, 'flow_hat': 3.4, 'c': 0.9, 'r': 1, 'dt': 0.01, 'N': 100}
-    run_simulation(flow_list, conductivity_list, **parameters_set)
+    #run_simulation(flow_list, conductivity_list, **parameters_set)
 
     print("time elapsed: {:.2f}s".format(time.time() - start_time))
