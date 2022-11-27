@@ -104,31 +104,27 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
 
 
 def set_attributes(graph, pressure_list):
-    colour_const = 2
-    list = []
-    print(list(graph.nodes))
-    print(list)
-
-
-
-
-    print(type(graph.nodes))
-    print(*graph.nodes, "sdfsdg")
-    node_attrs = []
-    for i in nodes_data.index:
-        inside = {(int(nodes_data.to_numpy()[i][0]), int(nodes_data.to_numpy()[i][1])): {"pressure": pressure_list[i], "colour": pressure_list[i] * colour_const}}
-        node_attrs.append(inside)
-    print("AAAA", node_attrs[0])
-    print((node_attrs))
-    name_one = 4
-    print(name_one, "sdgdfgfghfg")
-
-    # atrrr = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
-    node_attrs = {(0, 0): {"pressure": pressure_list[0], "colour": pressure_list[0]*colour_const}}
-    print(type(node_attrs))
-
+    colour_const = 2  # scaling constant to get element from colour-space from pressure-space
+    # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
+    node_attrs = dict(graph.nodes)
+    iterator = 0
+    for key in node_attrs:
+        vals = {"pressure": pressure_list[iterator], "colour": pressure_list[iterator] * colour_const}
+        node_attrs[key] = vals
+        iterator += 1
     nx.set_node_attributes(graph, node_attrs)
     print(list(graph.nodes(data=True)))
+
+    # now for edges
+    colour_const = 3
+    edge_attrs = dict(graph.edges)
+    iterator = 0
+    for key in edge_attrs:
+        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator], "flow": flow_list[iterator],  "colour": flow_list[iterator] * colour_const}
+        edge_attrs[key] = vals
+        iterator += 1
+    nx.set_edge_attributes(graph, edge_attrs)
+    print(list(graph.edges(data=True)))
 
 
 def run_simulation(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
