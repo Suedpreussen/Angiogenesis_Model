@@ -100,7 +100,7 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     edges_data['flow'] = flow_list
     edges_data['press_diff'] = pressure_diff_list
     #print(edges_data)
-    return x_dagger, incidence_T, incidence_inv, source_list, pressure_list, length_list, conductivity_list, flow_list
+    return x_dagger, incidence_T, incidence_inv, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
 
 
 def set_attributes(graph):
@@ -120,7 +120,7 @@ def set_attributes(graph):
     edge_attrs = dict(graph.edges)
     iterator = 0
     for key in edge_attrs:
-        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator], "flow": flow_list[iterator],  "colour": flow_list[iterator] * colour_const}
+        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator], "flow": flow_list[iterator], "pressure_diff": pressure_diff_list[iterator],  "colour": flow_list[iterator] * colour_const}
         edge_attrs[key] = vals
         iterator += 1
     nx.set_edge_attributes(graph, edge_attrs)
@@ -165,17 +165,48 @@ def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat,
     #print(nodes_data)
 
 
-def run_simulation(graph, a, b, gamma, delta, flow_hat, c, r, dt, N):
+def graph_data_to_lists(graph):
+    #edges
+    conductivity_list = []
+    flow_list = []
+    length_list = []
+    pressure_diff_list = []
+    for i, f, data in graph.edges(data='conductivity'): conductivity_list.append(data)
+    for i, f, data in graph.edges(data='flow'): flow_list.append(data)
+    for i, f, data in graph.edges(data='length'): length_list.append(data)
+    for i, f, data in graph.edges(data='pressure_diff'): pressure_diff_list.append(data)
+
+    # nodes
+    pressure_list = []
+    if np.shape(nodes_data)[1] == 1:                                              # nodes are indexing by one int
+        for i, data in graph.edges(data='pressure'): pressure_list.append(data)
+    elif np.shape(nodes_data)[1] == 2:                                             # nodes are indexing by two ints
+        for i, f, data in graph.edges(data='pressure'): pressure_list.append(data)
+
+    #converting from list type to numpy arrays
+    conductivity_list = np.asarray(conductivity_list)
+    flow_list = np.asarray(flow_list)
+    length_list = np.asarray(length_list)
+    pressure_diff_list = np.asarray(pressure_diff_list)
+    length_list = np.asarray(length_list)
+    pressure_list = np.asarray(pressure_list)
+    return conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list
+
+
+def run_simulation_G(graph, a, b, gamma, delta, flow_hat, c, r, dt, N):  # operating on data from graphs and updating data inside graphs
     # solving diff eq
-    conductivity_list = graph.get_edge_data['conductivity']
-    print(conductivity_list)
+    conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list = graph_data_to_lists(graph)
     t = 0
     for n in range(1, N+1):
         condition = any(k < 0 for k in conductivity_list) # in the future I'll just delete the edges with K == 0 -- their radius is zero
         if not False:
+            iterator = 0
             for e in graph.edges:
                 con_val = graph.get_edge_data(*e)['conductivity']
                 print(e, con_val)
+                print(iterator, n)
+                iterator += 1
+
                 if con_val <= 0:
                     graph.remove_edge(*e)
                     print(e, 'removed')
@@ -208,7 +239,7 @@ def draw_graph(graph, name, pos):
     nx.draw_networkx(graph, pos=pos)
     nx.draw_networkx_nodes(graph, pos=pos)
     nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list*3)
-    plt.savefig("%s..png" % name)
+    plt.savefig("%s.png" % name)
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
     # edges colour - proportional to flow
@@ -226,18 +257,20 @@ if __name__ == '__main__':
     #incidence_matrix, graph, nodes_data, edges_data = generate_graph(adjacency_matrix)  # random graph
     incidence_matrix, graph, nodes_data, edges_data = generate_grid_graph(n, n)          # regular grid
     source_value = 5
-    x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list = generate_physical_values(number_of_nodes, source_value, incidence_matrix)
+    x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list = generate_physical_values(number_of_nodes, source_value, incidence_matrix)
     set_attributes(graph)
 
+    print(edges_data)
     pos = nx.spring_layout(graph)
     #pos_x = nx.multipartite_layout(graph, subset_key="layer")
     print(graph)
     draw_graph(graph, "graph", pos)
     # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
     parameters_set = {'a': 1.7, 'b': 0.5, 'gamma': 2/3, 'delta': 2.1, 'flow_hat': 3.4, 'c': 0, 'r': 1, 'dt': 0.001, 'N': 300}
-    run_simulation_A(flow_list, conductivity_list, **parameters_set)
-    print(edges_data)
+    #run_simulation_A(flow_list, conductivity_list, **parameters_set)
+    run_simulation_G(graph, **parameters_set)
     draw_graph(graph, "final_graph", pos)
     print(graph)
+    print(edges_data)
 
     print("time elapsed: {:.2f}s".format(time.time() - start_time))
