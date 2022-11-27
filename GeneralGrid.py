@@ -109,7 +109,7 @@ def set_attributes(graph):
     node_attrs = dict(graph.nodes)
     iterator = 0
     for key in node_attrs:
-        vals = {"pressure": pressure_list[iterator], "colour": pressure_list[iterator] * colour_const}
+        vals = {"pressure": pressure_list[iterator], "node_colour": pressure_list[iterator] * colour_const}
         node_attrs[key] = vals
         iterator += 1
     nx.set_node_attributes(graph, node_attrs)
@@ -120,11 +120,23 @@ def set_attributes(graph):
     edge_attrs = dict(graph.edges)
     iterator = 0
     for key in edge_attrs:
-        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator], "flow": flow_list[iterator], "pressure_diff": pressure_diff_list[iterator],  "colour": flow_list[iterator] * colour_const}
+        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator], "flow": flow_list[iterator], "pressure_diff": pressure_diff_list[iterator],  "edge_colour": flow_list[iterator] * colour_const}
         edge_attrs[key] = vals
         iterator += 1
     nx.set_edge_attributes(graph, edge_attrs)
     #print(list(graph.edges(data=True)))
+
+
+    def update_graph_data(graph):
+        pass
+        # iterate over attributes and update values
+        # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
+        for tuples_as_keys in graph.nodes(data=True):
+            for dics_as_keys in graph.nodes(data="pressure"):
+                pass
+            for dics_as_keys in graph.nodes(data="node_colour"):
+                pass
+
 
 
 def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
@@ -152,9 +164,12 @@ def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat,
             x_dagger = np.linalg.pinv(x)
             # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
             flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
-            #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
+            #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list   # 1/conduct generates infinities when conduct approaches zero!!
             #pressure_list = np.dot(pressure_diff_list, incidence_inv)
+            # updating data in graph dics
+            set_attributes(graph)
     print('simulation time: ', t, ' seconds')
+
 
     # updating data frames
     edges_data['conduct.'] = conductivity_list
@@ -266,9 +281,9 @@ if __name__ == '__main__':
     print(graph)
     draw_graph(graph, "graph", pos)
     # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
-    parameters_set = {'a': 1.7, 'b': 0.5, 'gamma': 2/3, 'delta': 2.1, 'flow_hat': 3.4, 'c': 0, 'r': 1, 'dt': 0.001, 'N': 300}
-    #run_simulation_A(flow_list, conductivity_list, **parameters_set)
-    run_simulation_G(graph, **parameters_set)
+    parameters_set = {'a': 1, 'b': 1, 'gamma': 1, 'delta': 1, 'flow_hat': 1, 'c': 1, 'r': 1, 'dt': 0.0001, 'N': 11000}
+    run_simulation_A(flow_list, conductivity_list, **parameters_set)
+    #run_simulation_G(graph, **parameters_set)
     draw_graph(graph, "final_graph", pos)
     print(graph)
     print(edges_data)
