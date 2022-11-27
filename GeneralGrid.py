@@ -103,7 +103,7 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     return x_dagger, incidence_T, incidence_inv, source_list, pressure_list, length_list, conductivity_list, flow_list
 
 
-def set_attributes(graph, pressure_list):
+def set_attributes(graph):
     colour_const = 2  # scaling constant to get element from colour-space from pressure-space
     # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
     node_attrs = dict(graph.nodes)
@@ -113,7 +113,7 @@ def set_attributes(graph, pressure_list):
         node_attrs[key] = vals
         iterator += 1
     nx.set_node_attributes(graph, node_attrs)
-    print(list(graph.nodes(data=True)))
+    #print(list(graph.nodes(data=True)))
 
     # now for edges
     colour_const = 3
@@ -124,14 +124,23 @@ def set_attributes(graph, pressure_list):
         edge_attrs[key] = vals
         iterator += 1
     nx.set_edge_attributes(graph, edge_attrs)
-    print(list(graph.edges(data=True)))
+    #print(list(graph.edges(data=True)))
 
 
-def run_simulation(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
+def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
     # solving diff eq
     t = 0
     for n in range(1, N+1):
-        if not any(k < 0 for k in conductivity_list):  # in the future I'll just delete the edges with K == 0 -- their radius is zero
+        condition = any(k < 0 for k in conductivity_list) # in the future I'll just delete the edges with K == 0 -- their radius is zero
+        if not False:
+            iter = 0
+            for e in graph.edges:
+                con_val = conductivity_list[iter]
+                #print(e, con_val)
+                if con_val <= 0:
+                    graph.remove_edge(*e)
+                    print(e, 'removed')
+                iter += 1
             t = dt * n
             # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
             # flow_list is separated into its sign and value, because I don't want to get complex values
@@ -139,35 +148,74 @@ def run_simulation(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c
             # the information about direction is not coded into graph, so I have to be careful here
             dK = dt * (np.sign(flow_list) * np.float_power(a * (np.exp(r*t*delta/2) * np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
             conductivity_list += dK
-
             x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
             x_dagger = np.linalg.pinv(x)
             # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
             flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
-            pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
-            pressure_list = np.dot(pressure_diff_list, incidence_inv)
+            #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
+            #pressure_list = np.dot(pressure_diff_list, incidence_inv)
     print('simulation time: ', t, ' seconds')
 
     # updating data frames
     edges_data['conduct.'] = conductivity_list
     edges_data['flow'] = flow_list
-    edges_data['press_diff'] = pressure_diff_list
+    #edges_data['press_diff'] = pressure_diff_list
     #print(edges_data)
-    nodes_data['pressure'] = pressure_list
+    #nodes_data['pressure'] = pressure_list
     #print(nodes_data)
 
 
-def draw_graph(graph):
-    pass
-    #straight_lines = nx.multipartite_layout(graph)     # sets nodes in straight lines
-    #nx.draw_networkx(graph, pos=straight_lines)
-    #plt.savefig("graph.png")
+def run_simulation(graph, a, b, gamma, delta, flow_hat, c, r, dt, N):
+    # solving diff eq
+    conductivity_list = graph.get_edge_data['conductivity']
+    print(conductivity_list)
+    t = 0
+    for n in range(1, N+1):
+        condition = any(k < 0 for k in conductivity_list) # in the future I'll just delete the edges with K == 0 -- their radius is zero
+        if not False:
+            for e in graph.edges:
+                con_val = graph.get_edge_data(*e)['conductivity']
+                print(e, con_val)
+                if con_val <= 0:
+                    graph.remove_edge(*e)
+                    print(e, 'removed')
+            t = dt * n
+            # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
+            # flow_list is separated into its sign and value, because I don't want to get complex values
+            # the direction of the flow is maintained while its value changes
+            # the information about direction is not coded into graph, so I have to be careful here
+            dK = dt * (np.sign(flow_list) * np.float_power(a * (np.exp(r*t*delta/2) * np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
+            conductivity_list += dK
+            x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
+            x_dagger = np.linalg.pinv(x)
+            # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
+            flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
+            #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
+            #pressure_list = np.dot(pressure_diff_list, incidence_inv)
+    print('simulation time: ', t, ' seconds')
+
+    # updating data frames
+    edges_data['conduct.'] = conductivity_list
+    edges_data['flow'] = flow_list
+    #edges_data['press_diff'] = pressure_diff_list
+    #print(edges_data)
+    #nodes_data['pressure'] = pressure_list
+    #print(nodes_data)
+
+
+def draw_graph(graph, name, pos):
+    #straight_lines = nx.multipartite_layout(graph)    # sets nodes in straight lines
+    nx.draw_networkx(graph, pos=pos)
+    nx.draw_networkx_nodes(graph, pos=pos)
+    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list*3)
+    plt.savefig("%s..png" % name)
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
     # edges colour - proportional to flow
     # edges arrows - in alignment with the sign of flow
-    # edges thickness - proportional to (conductivity)^(-4)
-    # , node_color=range(24), node_size=800, cmap=plt.cm.Blues
+    # edges thickness - proportional to (conductivity)^(-4)s
+    # node_color=range(24), node_size=800, cmap=plt.cm.Blues
+
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -179,9 +227,17 @@ if __name__ == '__main__':
     incidence_matrix, graph, nodes_data, edges_data = generate_grid_graph(n, n)          # regular grid
     source_value = 5
     x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list = generate_physical_values(number_of_nodes, source_value, incidence_matrix)
-    set_attributes(graph, pressure_list)
-    #draw_graph(graph)
-    parameters_set = {'a': 1.7, 'b': 0.5, 'gamma': 2/3, 'delta': 2.1, 'flow_hat': 3.4, 'c': 0.9, 'r': 1, 'dt': 0.01, 'N': 100}
-    #run_simulation(flow_list, conductivity_list, **parameters_set)
+    set_attributes(graph)
+
+    pos = nx.spring_layout(graph)
+    #pos_x = nx.multipartite_layout(graph, subset_key="layer")
+    print(graph)
+    draw_graph(graph, "graph", pos)
+    # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
+    parameters_set = {'a': 1.7, 'b': 0.5, 'gamma': 2/3, 'delta': 2.1, 'flow_hat': 3.4, 'c': 0, 'r': 1, 'dt': 0.001, 'N': 300}
+    run_simulation_A(flow_list, conductivity_list, **parameters_set)
+    print(edges_data)
+    draw_graph(graph, "final_graph", pos)
+    print(graph)
 
     print("time elapsed: {:.2f}s".format(time.time() - start_time))
