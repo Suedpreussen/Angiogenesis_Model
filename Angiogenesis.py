@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import time
 import scipy
+import matplotlib
+import seaborn as sns
+from bokeh.io import export_png, export_svgs
+from bokeh.models import ColumnDataSource, DataTable, TableColumn
 
 """
 General idea:
@@ -12,9 +16,27 @@ adjacency matrix --> incidence matrix, nodes, edges -->
 ---> assign physical attributes --> run simulation --> create visualisation
 """
 
+"""
+TABLE OF CONTENT
+--------------------
 
-# undirected graph
+generate_random_adjacent_matrix  # not used
+generate_graph  # not used
+generate_grid_graph
+generate_physical_values
+update_df
+set attributes
+update_graph_data
+run_simulation_A
+graph_data_to_lists  # not used
+run_simulation_G     # not used
+draw_graph
+
+"""
+
+
 def generate_random_adjacent_matrix(dimension):   # dimension == #nodes
+    # undirected graph
     condition = True
     while condition:
         matrix = np.zeros((dimension, dimension))
@@ -83,27 +105,37 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list)  @ incidence_T
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
-
-    # update data frames for both spaces
-    if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
-        nodes_data.insert(loc=1, column='source', value=source_list)
-        nodes_data.columns = ['nodes', 'source']
-        nodes_data.insert(loc=2, column='pressure', value=pressure_list)
-    elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
-        nodes_data.columns = ['no-', '-des']
-        nodes_data['source'] = source_list
-        nodes_data['pressure'] = pressure_list
-    #print(nodes_data)
-    edges_data.columns = ['ed-', '-ges']
-    edges_data['length'] = length_list
-    edges_data['conduct.'] = conductivity_list
-    edges_data['flow'] = flow_list
-    edges_data['press_diff'] = pressure_diff_list
-    #print(edges_data)
     return x_dagger, incidence_T, incidence_inv, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
 
 
-def set_attributes(graph):
+def update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time = False):
+    # update data frames for both spaces
+    if first_time:
+        if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
+            #nodes_data.insert(loc=1, column='source', value=source_list)
+            nodes_data.columns = ['nodes', 'source']
+            nodes_data.insert(loc=2, column='pressure', value=pressure_list)
+        elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
+            nodes_data.columns = ['no-', '-des']
+            nodes_data['pressure'] = pressure_list
+        print(nodes_data)
+        edges_data.columns = ['ed-', '-ges']
+        edges_data['length'] = length_list
+        edges_data['conduct.'] = conductivity_list
+        edges_data['flow'] = flow_list
+        edges_data['press_diff'] = pressure_diff_list
+        print(edges_data)
+    else:
+        # updating data frames
+        edges_data['conduct.'] = conductivity_list
+        edges_data['flow'] = flow_list
+        edges_data['press_diff'] = pressure_diff_list
+        print(edges_data)
+        nodes_data['pressure'] = pressure_list
+        print(nodes_data)
+
+
+def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list):
     colour_const = 2  # scaling constant to get element from colour-space from pressure-space
     # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
     node_attrs = dict(graph.nodes)
@@ -127,19 +159,18 @@ def set_attributes(graph):
     #print(list(graph.edges(data=True)))
 
 
-    def update_graph_data(graph):
-        pass
-        # iterate over attributes and update values
-        # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
-        for tuples_as_keys in graph.nodes(data=True):
-            for dics_as_keys in graph.nodes(data="pressure"):
-                pass
-            for dics_as_keys in graph.nodes(data="node_colour"):
-                pass
+def update_graph_data(graph):
+    pass
+    # iterate over attributes and update values
+    # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
+    for tuples_as_keys in graph.nodes(data=True):
+        for dics_as_keys in graph.nodes(data="pressure"):
+            pass
+        for dics_as_keys in graph.nodes(data="node_colour"):
+            pass
 
 
-
-def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
+def run_simulation_A(incidence_inv, incidence_T, incidence_matrix, graph, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
     # solving diff eq
     t = 0
     for n in range(1, N+1):
@@ -158,7 +189,8 @@ def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat,
             # flow_list is separated into its sign and value, because I don't want to get complex values
             # the direction of the flow is maintained while its value changes
             # the information about direction is not coded into graph, so I have to be careful here
-            dK = dt * (np.sign(flow_list) * np.float_power(a * (np.exp(r*t*delta/2) * np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
+            # DELETING MINUS SIGN!!!!!!!!
+            dK = dt * (np.float_power(a * (np.exp(r*t*delta/2) * np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
             conductivity_list += dK
             x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
             x_dagger = np.linalg.pinv(x)
@@ -167,19 +199,11 @@ def run_simulation_A(flow_list, conductivity_list, a, b, gamma, delta, flow_hat,
             #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list   # 1/conduct generates infinities when conduct approaches zero!!
             #pressure_list = np.dot(pressure_diff_list, incidence_inv)
             # updating data in graph dics
-            set_attributes(graph)
+            set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
     print('simulation time: ', t, ' seconds')
 
 
-    # updating data frames
-    edges_data['conduct.'] = conductivity_list
-    edges_data['flow'] = flow_list
-    #edges_data['press_diff'] = pressure_diff_list
-    #print(edges_data)
-    #nodes_data['pressure'] = pressure_list
-    #print(nodes_data)
-
-
+"""
 def graph_data_to_lists(graph):
     #edges
     conductivity_list = []
@@ -193,9 +217,9 @@ def graph_data_to_lists(graph):
 
     # nodes
     pressure_list = []
-    if np.shape(nodes_data)[1] == 1:                                              # nodes are indexing by one int
+    if np.shape(pd.DataFrame(graph.nodes))[1] == 1:                                              # nodes are indexing by one int
         for i, data in graph.edges(data='pressure'): pressure_list.append(data)
-    elif np.shape(nodes_data)[1] == 2:                                             # nodes are indexing by two ints
+    elif np.shape(pd.DataFrame(graph.nodes))[1] == 2:                                             # nodes are indexing by two ints
         for i, f, data in graph.edges(data='pressure'): pressure_list.append(data)
 
     #converting from list type to numpy arrays
@@ -206,8 +230,9 @@ def graph_data_to_lists(graph):
     length_list = np.asarray(length_list)
     pressure_list = np.asarray(pressure_list)
     return conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list
+"""
 
-
+"""
 def run_simulation_G(graph, a, b, gamma, delta, flow_hat, c, r, dt, N):  # operating on data from graphs and updating data inside graphs
     # solving diff eq
     conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list = graph_data_to_lists(graph)
@@ -247,9 +272,10 @@ def run_simulation_G(graph, a, b, gamma, delta, flow_hat, c, r, dt, N):  # opera
     #print(edges_data)
     #nodes_data['pressure'] = pressure_list
     #print(nodes_data)
+"""
 
 
-def draw_graph(graph, name, pos):
+def draw_graph(graph, name, pos, conductivity_list):
     #straight_lines = nx.multipartite_layout(graph)    # sets nodes in straight lines
     nx.draw_networkx(graph, pos=pos)
     nx.draw_networkx_nodes(graph, pos=pos)
@@ -262,30 +288,15 @@ def draw_graph(graph, name, pos):
     # edges thickness - proportional to (conductivity)^(-4)s
     # node_color=range(24), node_size=800, cmap=plt.cm.Blues
 
-
-if __name__ == '__main__':
-    start_time = time.time()
-
-    n = 3
-    number_of_nodes = n*n
-    adjacency_matrix = generate_random_adjacent_matrix(number_of_nodes)
-    #incidence_matrix, graph, nodes_data, edges_data = generate_graph(adjacency_matrix)  # random graph
-    incidence_matrix, graph, nodes_data, edges_data = generate_grid_graph(n, n)          # regular grid
-    source_value = 5
-    x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list = generate_physical_values(number_of_nodes, source_value, incidence_matrix)
-    set_attributes(graph)
-
-    print(edges_data)
-    pos = nx.spring_layout(graph)
-    #pos_x = nx.multipartite_layout(graph, subset_key="layer")
-    print(graph)
-    draw_graph(graph, "graph", pos)
-    # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
-    parameters_set = {'a': 1, 'b': 1, 'gamma': 1, 'delta': 1, 'flow_hat': 1, 'c': 1, 'r': 1, 'dt': 0.0001, 'N': 11000}
-    run_simulation_A(flow_list, conductivity_list, **parameters_set)
-    #run_simulation_G(graph, **parameters_set)
-    draw_graph(graph, "final_graph", pos)
-    print(graph)
-    print(edges_data)
-
-    print("time elapsed: {:.2f}s".format(time.time() - start_time))
+"""
+def save_df_as_image(df, path):
+    # Set background to white
+    norm = matplotlib.colors.Normalize(-1, 1)
+    colors = [[norm(-1.0), "white"],
+              [norm(1.0), "white"]]
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)         # this code could be useful
+    # Make plot
+    plot = sns.heatmap(df, annot=True, cmap=cmap, cbar=False)
+    fig = plot.g
+    fig.savefig(path)
+"""
