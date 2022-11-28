@@ -170,38 +170,50 @@ def update_graph_data(graph):
             pass
 
 
-def run_simulation_A(incidence_inv, incidence_T, incidence_matrix, graph, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
+def checking_Murrays_law():
+    # Q = const * r^3
+    # r^3 = sum over cubes of radii of daughter branches
+    pass
+
+
+def checking_Kirchhoffs_law():
+    # 100 * |theoretical value - simulated value| / th. val. = diff. between theory and simulation in percents
+    # sum of flows = sum of sources = 0
+    pass
+
+
+def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, incidence_matrix, graph, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
     # solving diff eq
+    # without scaling factors
     t = 0
     for n in range(1, N+1):
-        condition = any(k < 0 for k in conductivity_list) # in the future I'll just delete the edges with K == 0 -- their radius is zero
-        if not False:
-            iter = 0
-            for e in graph.edges:
-                con_val = conductivity_list[iter]
-                #print(e, con_val)
-                if con_val <= 0:
-                    graph.remove_edge(*e)
-                    print(e, 'removed')
-                iter += 1
-            t = dt * n
-            # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
-            # flow_list is separated into its sign and value, because I don't want to get complex values
-            # the direction of the flow is maintained while its value changes
-            # the information about direction is not coded into graph, so I have to be careful here
-            # DELETING MINUS SIGN!!!!!!!!
-            dK = dt * (np.float_power(a * (np.exp(r*t*delta/2) * np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
-            conductivity_list += dK
-            x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
-            x_dagger = np.linalg.pinv(x)
-            # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
-            flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
-            #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list   # 1/conduct generates infinities when conduct approaches zero!!
-            #pressure_list = np.dot(pressure_diff_list, incidence_inv)
-            # updating data in graph dics
-            set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
-    print('simulation time: ', t, ' seconds')
 
+        # pruning implementation
+        iter = 0
+        for e in graph.edges:
+            con_val = conductivity_list[iter]
+            #print(e, con_val)
+            if con_val <= 0:
+                graph.remove_edge(*e)
+                print(e, 'removed')
+            iter += 1
+
+        t = dt * n
+        # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c                                                                #exp(r*t/2)^(delta) *
+        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)      # np.exp(r*t*delta/2) *
+        conductivity_list += dK
+        x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
+        x_dagger = np.linalg.pinv(x)
+        # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
+        flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
+        pressure_diff_list = length_list * (1 / conductivity_list) * flow_list   # 1/conduct generates infinities when conduct approaches zero!!
+        pressure_list = np.dot(pressure_diff_list, incidence_inv)
+
+        # updating data in graph dics
+        set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
+
+    print('simulation time: ', t, ' seconds')
+    update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
 
 """
 def graph_data_to_lists(graph):

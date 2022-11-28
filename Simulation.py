@@ -4,7 +4,7 @@ import networkx as nx
 
 start_time = time.time()
 
-n = 3
+n = 6
 number_of_nodes = n*n
 adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 #incidence_matrix, graph, nodes_data, edges_data = generate_graph(adjacency_matrix)     # random graph
@@ -22,14 +22,12 @@ an.set_attributes(graph, pressure_list, length_list, conductivity_list, flow_lis
 an.update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time=True)
 pos = nx.spring_layout(graph)
 #pos_x = nx.multipartite_layout(graph, subset_key="layer")
-print(graph)
+
 an.draw_graph(graph, "graph", pos, conductivity_list)
 # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 1.1, 'b': 1.1, 'gamma': 1.1, 'delta': 1.1, 'flow_hat': 1.1, 'c': 10.1, 'r': 1.1, 'dt': 0.0001, 'N': 20000}
-an.run_simulation_A(**arguments, **parameters_set)
+parameters_set = {'a': 1.1, 'b': 1.1, 'gamma': 1.1, 'delta': 1.1, 'flow_hat': 1.1, 'c': 0.1, 'r': 1.1, 'dt': 0.1, 'N': 1}
+an.run_simulation_A(nodes_data, edges_data, **arguments, **parameters_set)
 #an.run_simulation_G(graph, **parameters_set)
 an.draw_graph(graph, "final_graph", pos, conductivity_list)
-print(graph)
-an.update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
