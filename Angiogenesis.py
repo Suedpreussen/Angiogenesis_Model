@@ -9,6 +9,7 @@ import matplotlib
 import seaborn as sns
 from bokeh.io import export_png, export_svgs
 from bokeh.models import ColumnDataSource, DataTable, TableColumn
+import sys
 
 """
 General idea:
@@ -29,7 +30,6 @@ set attributes
 update_graph_data
 run_simulation_A
 graph_data_to_lists  # not used
-run_simulation_G     # not used
 draw_graph
 
 """
@@ -99,6 +99,9 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     source_list[dimension-1] = -source_value      # but I want only outermost nodes to be the sinks, how to do this?
     # q = S * (delta^T)^-1
     flow_list = np.dot(source_list, incidence_T_inv)
+    source_list = flow_list @ incidence_T
+    print("SOURCE", source_list)
+    print(flow_list)
     # delta*p = K/L * q
     pressure_diff_list = length_list * (1/conductivity_list) * flow_list
     pressure_list = np.dot(pressure_diff_list, incidence_inv)
@@ -173,13 +176,21 @@ def update_graph_data(graph):
 def checking_Murrays_law():
     # Q = const * r^3
     # r^3 = sum over cubes of radii of daughter branches
+    # first of all, network needs to be hierarchical
     pass
 
 
-def checking_Kirchhoffs_law():
+def checking_Kirchhoffs_law(graph):
     # 100 * |theoretical value - simulated value| / th. val. = diff. between theory and simulation in percents
-    # sum of flows = sum of sources = 0
-    pass
+    for node in graph.nodes(data=False):
+        sum = 0
+        for edge in graph.edges(node):
+            sum += graph[edge[0]][edge[1]]['flow']
+            #print(sum)
+        if -1e-11 < sum < 1e-11:
+            print("Kirchhoff's law at node {} fulfilled".format(node))
+        else:
+            print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum)
 
 
 def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, incidence_matrix, graph, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
@@ -242,48 +253,6 @@ def graph_data_to_lists(graph):
     length_list = np.asarray(length_list)
     pressure_list = np.asarray(pressure_list)
     return conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list
-"""
-
-"""
-def run_simulation_G(graph, a, b, gamma, delta, flow_hat, c, r, dt, N):  # operating on data from graphs and updating data inside graphs
-    # solving diff eq
-    conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list = graph_data_to_lists(graph)
-    t = 0
-    for n in range(1, N+1):
-        condition = any(k < 0 for k in conductivity_list) # in the future I'll just delete the edges with K == 0 -- their radius is zero
-        if not False:
-            iterator = 0
-            for e in graph.edges:
-                con_val = graph.get_edge_data(*e)['conductivity']
-                print(e, con_val)
-                print(iterator, n)
-                iterator += 1
-
-                if con_val <= 0:
-                    graph.remove_edge(*e)
-                    print(e, 'removed')
-            t = dt * n
-            # dK/dt = a*(exp(r*t/2)^(delta) * q / q_hat)^(2*gamma) - b * K + c
-            # flow_list is separated into its sign and value, because I don't want to get complex values
-            # the direction of the flow is maintained while its value changes
-            # the information about direction is not coded into graph, so I have to be careful here
-            dK = dt * (np.sign(flow_list) * np.float_power(a * (np.exp(r*t*delta/2) * np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
-            conductivity_list += dK
-            x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
-            x_dagger = np.linalg.pinv(x)
-            # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
-            flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
-            #pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
-            #pressure_list = np.dot(pressure_diff_list, incidence_inv)
-    print('simulation time: ', t, ' seconds')
-
-    # updating data frames
-    edges_data['conduct.'] = conductivity_list
-    edges_data['flow'] = flow_list
-    #edges_data['press_diff'] = pressure_diff_list
-    #print(edges_data)
-    #nodes_data['pressure'] = pressure_list
-    #print(nodes_data)
 """
 
 
