@@ -75,11 +75,18 @@ def generate_graph(adjacent_matrix):
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_grid_graph(dim_A, dim_B):
-    graph = nx.grid_graph(dim=(dim_A, dim_B))
+def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
+    if hexagonal:
+        graph = nx.hexagonal_lattice_graph(dim_A, dim_B, periodic=False)
+    elif triangular:
+        graph = nx.triangular_lattice_graph(dim_A, dim_B, periodic=False)
+    else:
+        graph = nx.grid_graph(dim=(dim_A, dim_B))
     inc_mtx = nx.incidence_matrix(graph)
     inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
     inc_mtx_dense_int = inc_mtx_dense.astype(int)
+    print(np.shape(inc_mtx_dense_int))
+    print(np.shape(nx.adjacency_matrix(graph)))
     nodes_list = graph.nodes()
     edges_list = graph.edges()
     nodes_data = pd.DataFrame(nodes_list)
@@ -87,7 +94,8 @@ def generate_grid_graph(dim_A, dim_B):
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_physical_values(dimension, source_value, incidence_matrix):
+def generate_physical_values(source_value, incidence_matrix):
+    dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
     incidence_T = incidence_matrix.transpose()
     incidence_T_inv = np.linalg.pinv(incidence_T)
@@ -98,10 +106,16 @@ def generate_physical_values(dimension, source_value, incidence_matrix):
     source_list[0] = source_value                 # but I want the central node to be the source, how to fix this?
     source_list[dimension-1] = -source_value      # but I want only outermost nodes to be the sinks, how to do this?
     # q = S * (delta^T)^-1
+    #print("SOURCE", source_list)
     flow_list = np.dot(source_list, incidence_T_inv)
-    source_list = flow_list @ incidence_T
+    #print("FLOW", flow_list)
+    """source_list = flow_list @ incidence_T
     print("SOURCE", source_list)
-    print(flow_list)
+    flow_list = source_list @ incidence_T_inv
+    print("FLOW", flow_list)
+    a = incidence_T_inv @ incidence_T
+    print('aaa', a)
+    """
     # delta*p = K/L * q
     pressure_diff_list = length_list * (1/conductivity_list) * flow_list
     pressure_list = np.dot(pressure_diff_list, incidence_inv)
@@ -121,21 +135,21 @@ def update_df(pressure_list, length_list, conductivity_list, flow_list, pressure
         elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
             nodes_data.columns = ['no-', '-des']
             nodes_data['pressure'] = pressure_list
-        print(nodes_data)
+        #print(nodes_data)
         edges_data.columns = ['ed-', '-ges']
         edges_data['length'] = length_list
         edges_data['conduct.'] = conductivity_list
         edges_data['flow'] = flow_list
         edges_data['press_diff'] = pressure_diff_list
-        print(edges_data)
+        #print(edges_data)
     else:
         # updating data frames
         edges_data['conduct.'] = conductivity_list
         edges_data['flow'] = flow_list
         edges_data['press_diff'] = pressure_diff_list
-        print(edges_data)
+        #print(edges_data)
         nodes_data['pressure'] = pressure_list
-        print(nodes_data)
+        #print(nodes_data)
 
 
 def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list):
@@ -155,7 +169,9 @@ def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_li
     edge_attrs = dict(graph.edges)
     iterator = 0
     for key in edge_attrs:
-        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator], "flow": flow_list[iterator], "pressure_diff": pressure_diff_list[iterator],  "edge_colour": flow_list[iterator] * colour_const}
+        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator],
+                "flow": flow_list[iterator], "pressure_diff": pressure_diff_list[iterator],
+                "edge_colour": flow_list[iterator] * colour_const}
         edge_attrs[key] = vals
         iterator += 1
     nx.set_edge_attributes(graph, edge_attrs)
@@ -180,24 +196,35 @@ def checking_Murrays_law():
     pass
 
 
-def checking_Kirchhoffs_law(graph):
+def checking_Kirchhoffs_law(graph, source_list):
     # 100 * |theoretical value - simulated value| / th. val. = diff. between theory and simulation in percents
+    index = 0
+    successful_nodes = 0
     for node in graph.nodes(data=False):
         sum = 0
         for edge in graph.edges(node):
             sum += graph[edge[0]][edge[1]]['flow']
-            #print(sum)
-        if -1e-11 < sum < 1e-11:
-            print("Kirchhoff's law at node {} fulfilled".format(node))
+        if -1e-11 < sum - source_list[index] < 1e-11:
+            #print("Kirchhoff's law at node {} fulfilled".format(node))
+            successful_nodes += 1
         else:
-            print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum)
+            print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum - source_list[index])
+        index += 1
+    print(successful_nodes, graph.number_of_nodes())
+    if successful_nodes == graph.number_of_nodes():
+        print("SUCCESS! Kirchhoff's law fulfilled!")
 
-
-def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, incidence_matrix, graph, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, a, b, gamma, delta, flow_hat, c, r, dt, N):
+def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
+                     pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
+                     a, b, gamma, delta, flow_hat, c, r, dt, N):
     # solving diff eq
     # without scaling factors
+    # exp(r*t/2)^(delta)
+    # np.exp(r*t*delta/2)
+
     t = 0
     for n in range(1, N+1):
+        t += dt
 
         # pruning implementation
         iter = 0
@@ -209,9 +236,8 @@ def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, inciden
                 print(e, 'removed')
             iter += 1
 
-        t = dt * n
-        # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c                                                                #exp(r*t/2)^(delta) *
-        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)      # np.exp(r*t*delta/2) *
+        # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
+        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
         conductivity_list += dK
         x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
         x_dagger = np.linalg.pinv(x)
@@ -225,6 +251,7 @@ def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, inciden
 
     print('simulation time: ', t, ' seconds')
     update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
+
 
 """
 def graph_data_to_lists(graph):
@@ -256,11 +283,11 @@ def graph_data_to_lists(graph):
 """
 
 
-def draw_graph(graph, name, pos, conductivity_list):
+def draw_graph(graph, name, pos, conductivity_list, n):
     #straight_lines = nx.multipartite_layout(graph)    # sets nodes in straight lines
     nx.draw_networkx(graph, pos=pos)
-    nx.draw_networkx_nodes(graph, pos=pos)
-    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list*3)
+    nx.draw_networkx_nodes(graph, pos=pos, node_size=300/n)
+    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list)
     plt.savefig("%s.png" % name)
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
@@ -268,16 +295,3 @@ def draw_graph(graph, name, pos, conductivity_list):
     # edges arrows - in alignment with the sign of flow
     # edges thickness - proportional to (conductivity)^(-4)s
     # node_color=range(24), node_size=800, cmap=plt.cm.Blues
-
-"""
-def save_df_as_image(df, path):
-    # Set background to white
-    norm = matplotlib.colors.Normalize(-1, 1)
-    colors = [[norm(-1.0), "white"],
-              [norm(1.0), "white"]]
-    cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", colors)         # this code could be useful
-    # Make plot
-    plot = sns.heatmap(df, annot=True, cmap=cmap, cbar=False)
-    fig = plot.g
-    fig.savefig(path)
-"""
