@@ -197,7 +197,6 @@ def checking_Murrays_law():
 
 
 def checking_Kirchhoffs_law(graph, source_list):
-    # 100 * |theoretical value - simulated value| / th. val. = diff. between theory and simulation in percents
     index = 0
     successful_nodes = 0
     for node in graph.nodes(data=False):
@@ -222,6 +221,11 @@ def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, inciden
     # exp(r*t/2)^(delta)
     # np.exp(r*t*delta/2)
 
+    # energy on the outset
+    energy_list = length_list * flow_list * flow_list / conductivity_list
+    energy = np.sum(energy_list)
+    print("Energy: ", energy)
+
     t = 0
     for n in range(1, N+1):
         t += dt
@@ -245,6 +249,11 @@ def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, inciden
         flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
         pressure_diff_list = length_list * (1 / conductivity_list) * flow_list   # 1/conduct generates infinities when conduct approaches zero!!
         pressure_list = np.dot(pressure_diff_list, incidence_inv)
+
+        # calculating energy functional E = sum over edges L * Q^2 / K
+        energy_list = length_list * flow_list * flow_list / conductivity_list
+        energy = np.sum(energy_list)
+        print("Energy: ", energy)
 
         # updating data in graph dics
         set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)

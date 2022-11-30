@@ -23,8 +23,7 @@ arguments = {'pressure_list': pressure_list, 'length_list': length_list, 'conduc
              'incidence_T': incidence_T, 'incidence_inv': incidence_inv, 'graph': graph, 'source_list': source_list}
 
 an.set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
-
-#an.update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time=True)
+an.update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time=True)
 
 if hexagonal:
     pos = nx.get_node_attributes(graph, 'pos')  # hexagonal rigid layout
@@ -37,9 +36,11 @@ else:
 an.checking_Kirchhoffs_law(graph, source_list)
 
 an.draw_graph(graph, "graph", pos, conductivity_list, n)
+
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
 parameters_set = {'a': 1.1, 'b': 1.1, 'gamma': 2/3, 'delta': 0, 'flow_hat': 1.1, 'c': 0.1, 'r': 0, 'dt': 0.1, 'N': 100}
 an.run_simulation_A(nodes_data, edges_data, **arguments, **parameters_set)
+
 an.draw_graph(graph, "final_graph", pos, conductivity_list, n)
 
 an.checking_Kirchhoffs_law(graph, source_list)
