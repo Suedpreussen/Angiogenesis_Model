@@ -7,7 +7,7 @@ start_time = time.time()
 
 hexagonal = False
 triangular = False
-n = 4
+n = 6
 number_of_nodes = n*n
 adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
@@ -33,19 +33,17 @@ if hexagonal:
 elif triangular:
     pos = nx.get_node_attributes(graph, 'pos')  # triangular rigid layout
 else:
-    pos = nx.spring_layout(graph)                # standard layout
+    pos = dict((n, n) for n in graph.nodes())   # square rigid layout
 
 
 an.checking_Kirchhoffs_law(graph, source_list)
 an.draw_graph(graph, "graph", pos, conductivity_list, n)
-print(edges_data)
 
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 1.9, 'b': 2.3, 'gamma': 2/3, 'delta': 2, 'flow_hat': 3.1, 'c': 0.0, 'r': 1.1, 'dt': 0.01, 'N': 10000}
-an.run_simulation_A(nodes_data, edges_data, **arguments, **parameters_set)
+parameters_set = {'a': 1.9, 'b': 1.3, 'gamma': 2/3, 'delta': 2, 'flow_hat': 3.1, 'c': 0.001, 'r': 1.1, 'dt': 0.001, 'N': 100000}
+an.run_simulation(nodes_data, edges_data, **arguments, **parameters_set)
 
-print(edges_data)
-an.draw_graph(graph, "final_graph", pos, conductivity_list, n)
+an.draw_graph(graph, "final_graph3", pos, conductivity_list, n)
 an.checking_Kirchhoffs_law(graph, source_list)
 
 

@@ -10,6 +10,7 @@ import seaborn as sns
 from bokeh.io import export_png, export_svgs
 from bokeh.models import ColumnDataSource, DataTable, TableColumn
 import sys
+import matplotlib.animation as animation
 
 """
 General idea:
@@ -28,7 +29,7 @@ generate_physical_values
 update_df
 set attributes
 update_graph_data
-run_simulation_A
+run_simulation
 graph_data_to_lists  # not used
 draw_graph
 
@@ -220,18 +221,21 @@ def checking_Kirchhoffs_law(graph, source_list):
         print("SUCCESS! Kirchhoff's law fulfilled!")
 
 
-def energy_functional(conductivity_list, length_list, flow_list, gamma):
+def energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=False):
     # calculating energy functional E = sum over edges L * Q^2 / K
     energy_list = length_list * flow_list * flow_list / conductivity_list
     energy = np.sum(energy_list)
-    print("Energy: ", energy)
 
     # checking cost constraint = sum over edges L * K^(1/gamma - 1)
     constraint = np.sum(length_list * np.float_power(conductivity_list, (1/gamma - 1)))
-    print("Constraint: ", constraint)       # what does it mean when it's not constant?
+    # what does it mean when it's not constant?
+
+    if show_result:
+        print("Energy: ", energy)
+        print("Constraint: ", constraint)
 
 
-def run_simulation_A(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
+def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
                      pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
                      a, b, gamma, delta, flow_hat, c, r, dt, N):
     # solving diff eq
@@ -241,7 +245,7 @@ def run_simulation_A(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incid
 
 
 
-    energy_functional(conductivity_list, length_list, flow_list, gamma)
+    energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
 
     t = 0
     for n in range(1, N+1):
@@ -259,7 +263,6 @@ def run_simulation_A(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incid
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
         dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
-        dK = np.zeros(len(conductivity_list))
         conductivity_list += dK
 
         x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
@@ -275,6 +278,7 @@ def run_simulation_A(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incid
         # updating data in graph dics
         set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
 
+    energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', t, ' seconds')
     update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
 
@@ -314,10 +318,25 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     nx.draw_networkx(graph, pos=pos)
     nx.draw_networkx_nodes(graph, pos=pos, node_size=300/n)
     nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list * 3 + np.ones(len(conductivity_list)))
+
+    plt.axis('off')
     plt.savefig("%s.png" % name)
+    #plt.show()
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
     # edges colour - proportional to flow
     # edges arrows - in alignment with the sign of flow
     # edges thickness - proportional to (conductivity)^(-4)s
     # node_color=range(24), node_size=800, cmap=plt.cm.Blues
+
+"""
+def animate_graph():
+    fig, ax = plt.subplots()
+    ims = []
+
+    im = ax.imshow(f(x, y), animated=True)
+    ims.append([im])
+
+    ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000)
+    plt.show()
+"""
