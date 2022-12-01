@@ -85,8 +85,8 @@ def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
     inc_mtx = nx.incidence_matrix(graph)
     inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
     inc_mtx_dense_int = inc_mtx_dense.astype(int)
-    print(np.shape(inc_mtx_dense_int))
-    print(np.shape(nx.adjacency_matrix(graph)))
+    #print(np.shape(inc_mtx_dense_int))
+    #print(np.shape(nx.adjacency_matrix(graph)))
     nodes_list = graph.nodes()
     edges_list = graph.edges()
     nodes_data = pd.DataFrame(nodes_list)
@@ -97,41 +97,47 @@ def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
 def generate_physical_values(source_value, incidence_matrix):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
+
     incidence_T = incidence_matrix.transpose()
     incidence_T_inv = np.linalg.pinv(incidence_T)
     incidence_inv = np.linalg.pinv(incidence_matrix)
-    conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-0.001, 0.001, edges_dim)  # ones + stochastic noise
-    length_list = np.ones(edges_dim) + np.random.default_rng().uniform(-0.001, 0.001, edges_dim)        # vector from edges space
+
+    # checking moore-penrose inverse definition
+    #print(np.allclose(incidence_T_inv @ incidence_T @ incidence_T_inv, incidence_T_inv))
+    #print(np.allclose(incidence_T @ incidence_T_inv @ incidence_T, incidence_T))
+
+    eps = 0.01
+    conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
+    length_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
+
     source_list = np.zeros(dimension)             # vector from nodes space
-    source_list[0] = source_value                 # but I want the central node to be the source, how to fix this?
-    source_list[dimension-1] = -source_value      # but I want only outermost nodes to be the sinks, how to do this?
-    # q = S * (delta^T)^-1
+    source_list[0] = source_value
+    source_list[dimension-1] = -source_value
     #print("SOURCE", source_list)
+
+    # q = (delta^T)^-1 * S
     flow_list = np.dot(source_list, incidence_T_inv)
     #print("FLOW", flow_list)
-    """source_list = flow_list @ incidence_T
-    print("SOURCE", source_list)
-    flow_list = source_list @ incidence_T_inv
-    print("FLOW", flow_list)
-    a = incidence_T_inv @ incidence_T
-    print('aaa', a)
-    """
+
     # delta*p = K/L * q
-    pressure_diff_list = length_list * (1/conductivity_list) * flow_list
+    pressure_diff_list = flow_list * length_list * (1/conductivity_list)
     pressure_list = np.dot(pressure_diff_list, incidence_inv)
+
     # x = delta^T * K/L *delta
-    x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list)  @ incidence_T
+    x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
+
+
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
-    return x_dagger, incidence_T, incidence_inv, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
+
+    return incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
 
 
 def update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time = False):
     # update data frames for both spaces
     if first_time:
         if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
-            #nodes_data.insert(loc=1, column='source', value=source_list)
-            nodes_data.columns = ['nodes', 'source']
-            nodes_data.insert(loc=2, column='pressure', value=pressure_list)
+            nodes_data.columns = ['nodes']
+            nodes_data['pressure'] = pressure_list
         elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
             nodes_data.columns = ['no-', '-des']
             nodes_data['pressure'] = pressure_list
@@ -213,7 +219,19 @@ def checking_Kirchhoffs_law(graph, source_list):
     if successful_nodes == graph.number_of_nodes():
         print("SUCCESS! Kirchhoff's law fulfilled!")
 
-def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
+
+def energy_functional(conductivity_list, length_list, flow_list, gamma):
+    # calculating energy functional E = sum over edges L * Q^2 / K
+    energy_list = length_list * flow_list * flow_list / conductivity_list
+    energy = np.sum(energy_list)
+    print("Energy: ", energy)
+
+    # checking cost constraint = sum over edges L * K^(1/gamma - 1)
+    constraint = np.sum(length_list * np.float_power(conductivity_list, (1/gamma - 1)))
+    print("Constraint: ", constraint)       # what does it mean when it's not constant?
+
+
+def run_simulation_A(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
                      pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
                      a, b, gamma, delta, flow_hat, c, r, dt, N):
     # solving diff eq
@@ -221,10 +239,9 @@ def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, inciden
     # exp(r*t/2)^(delta)
     # np.exp(r*t*delta/2)
 
-    # energy on the outset
-    energy_list = length_list * flow_list * flow_list / conductivity_list
-    energy = np.sum(energy_list)
-    print("Energy: ", energy)
+
+
+    energy_functional(conductivity_list, length_list, flow_list, gamma)
 
     t = 0
     for n in range(1, N+1):
@@ -235,25 +252,25 @@ def run_simulation_A(nodes_data, edges_data, incidence_inv, incidence_T, inciden
         for e in graph.edges:
             con_val = conductivity_list[iter]
             #print(e, con_val)
-            if con_val <= 0:
+            if con_val < 1e-9:
                 graph.remove_edge(*e)
                 print(e, 'removed')
             iter += 1
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c)
+        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+        dK = np.zeros(len(conductivity_list))
         conductivity_list += dK
-        x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
-        x_dagger = np.linalg.pinv(x)
-        # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
-        flow_list = source_list @ (x_dagger @ incidence_matrix) @ np.diag(conductivity_list) @ np.diag(1 / length_list)
-        pressure_diff_list = length_list * (1 / conductivity_list) * flow_list   # 1/conduct generates infinities when conduct approaches zero!!
-        pressure_list = np.dot(pressure_diff_list, incidence_inv)
 
-        # calculating energy functional E = sum over edges L * Q^2 / K
-        energy_list = length_list * flow_list * flow_list / conductivity_list
-        energy = np.sum(energy_list)
-        print("Energy: ", energy)
+        x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
+
+        x_dagger = np.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
+
+        # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
+        flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
+        pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
+        pressure_list = np.dot(pressure_diff_list, incidence_inv)
+        energy_functional(conductivity_list, length_list, flow_list, gamma)
 
         # updating data in graph dics
         set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
@@ -296,7 +313,7 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     #straight_lines = nx.multipartite_layout(graph)    # sets nodes in straight lines
     nx.draw_networkx(graph, pos=pos)
     nx.draw_networkx_nodes(graph, pos=pos, node_size=300/n)
-    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list)
+    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list * 3 + np.ones(len(conductivity_list)))
     plt.savefig("%s.png" % name)
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
