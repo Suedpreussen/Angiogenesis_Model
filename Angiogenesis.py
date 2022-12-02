@@ -30,50 +30,10 @@ update_df
 set attributes
 update_graph_data
 run_simulation
-graph_data_to_lists  # not used
 draw_graph
 
+unused code sent to Utils file
 """
-
-
-def generate_random_adjacent_matrix(dimension):   # dimension == #nodes
-    # undirected graph
-    condition = True
-    while condition:
-        matrix = np.zeros((dimension, dimension))
-        for i in range(dimension):
-            for j in range(dimension):
-                if i != j:
-                    matrix[i][j] = random.choice([0, 1])
-        L = np.tril(matrix)
-        U = np.transpose(L)                    # np.sum(U) == #edges
-        symmetric_matrix = L + U
-        if np.sum(symmetric_matrix) != 0:
-            if np.trace(symmetric_matrix) == 0:
-                if np.linalg.det(symmetric_matrix) != 0:
-                    return symmetric_matrix
-                    condition = False        # finish the process and create required matrix
-                else:
-                    pass
-                    #print("Error: some of the nodes are not connected.")
-            else:
-                pass
-                #print("Error: generated matrix isn't an adjacent one as its trace is nonzero.")
-        else:
-            pass
-            #print("Error: generated matrix has zero-valued elements only and thus can't represent a graph.")
-
-
-def generate_graph(adjacent_matrix):
-    graph = nx.from_numpy_matrix(adjacent_matrix, parallel_edges=True)
-    inc_mtx = nx.incidence_matrix(graph)
-    inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
-    inc_mtx_dense_int = inc_mtx_dense.astype(int)
-    nodes_list = graph.nodes()
-    edges_list = graph.edges()
-    nodes_data = pd.DataFrame(nodes_list)
-    edges_data = pd.DataFrame(edges_list)
-    return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
 def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
@@ -115,6 +75,12 @@ def generate_physical_values(source_value, incidence_matrix):
     source_list[0] = source_value
     source_list[dimension-1] = -source_value
     #print("SOURCE", source_list)
+
+    """
+    # source for square lattice
+    if dimension %2 != 0:
+    
+    """
 
     # q = (delta^T)^-1 * S
     flow_list = np.dot(source_list, incidence_T_inv)
@@ -159,6 +125,7 @@ def update_df(pressure_list, length_list, conductivity_list, flow_list, pressure
         #print(nodes_data)
 
 
+
 def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list):
     colour_const = 2  # scaling constant to get element from colour-space from pressure-space
     # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
@@ -183,17 +150,6 @@ def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_li
         iterator += 1
     nx.set_edge_attributes(graph, edge_attrs)
     #print(list(graph.edges(data=True)))
-
-
-def update_graph_data(graph):
-    pass
-    # iterate over attributes and update values
-    # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
-    for tuples_as_keys in graph.nodes(data=True):
-        for dics_as_keys in graph.nodes(data="pressure"):
-            pass
-        for dics_as_keys in graph.nodes(data="node_colour"):
-            pass
 
 
 def checking_Murrays_law():
@@ -283,41 +239,10 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
     update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
 
 
-"""
-def graph_data_to_lists(graph):
-    #edges
-    conductivity_list = []
-    flow_list = []
-    length_list = []
-    pressure_diff_list = []
-    for i, f, data in graph.edges(data='conductivity'): conductivity_list.append(data)
-    for i, f, data in graph.edges(data='flow'): flow_list.append(data)
-    for i, f, data in graph.edges(data='length'): length_list.append(data)
-    for i, f, data in graph.edges(data='pressure_diff'): pressure_diff_list.append(data)
-
-    # nodes
-    pressure_list = []
-    if np.shape(pd.DataFrame(graph.nodes))[1] == 1:                                              # nodes are indexing by one int
-        for i, data in graph.edges(data='pressure'): pressure_list.append(data)
-    elif np.shape(pd.DataFrame(graph.nodes))[1] == 2:                                             # nodes are indexing by two ints
-        for i, f, data in graph.edges(data='pressure'): pressure_list.append(data)
-
-    #converting from list type to numpy arrays
-    conductivity_list = np.asarray(conductivity_list)
-    flow_list = np.asarray(flow_list)
-    length_list = np.asarray(length_list)
-    pressure_diff_list = np.asarray(pressure_diff_list)
-    length_list = np.asarray(length_list)
-    pressure_list = np.asarray(pressure_list)
-    return conductivity_list, flow_list, length_list, pressure_diff_list, pressure_list
-"""
-
-
-def draw_graph(graph, name, pos, conductivity_list, n):
-    #straight_lines = nx.multipartite_layout(graph)    # sets nodes in straight lines
-    nx.draw_networkx(graph, pos=pos)
-    nx.draw_networkx_nodes(graph, pos=pos, node_size=300/n)
-    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list * 3 + np.ones(len(conductivity_list)))
+def draw_graph(graph, name, pos, conductivity_list, flow_list, n):
+    #nx.draw_networkx(graph, pos=pos)
+    nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
+    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list )  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
 
     plt.axis('off')
     plt.savefig("%s.png" % name)
@@ -328,15 +253,6 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     # edges arrows - in alignment with the sign of flow
     # edges thickness - proportional to (conductivity)^(-4)s
     # node_color=range(24), node_size=800, cmap=plt.cm.Blues
-
-"""
-def animate_graph():
-    fig, ax = plt.subplots()
-    ims = []
-
-    im = ax.imshow(f(x, y), animated=True)
-    ims.append([im])
-
-    ani = animation.ArtistAnimation(fig, ims, interval=50, blit=True, repeat_delay=1000)
-    plt.show()
-"""
+    """
+    
+    """
