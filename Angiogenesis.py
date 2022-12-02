@@ -55,7 +55,7 @@ def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_physical_values(source_value, incidence_matrix):
+def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=True, square=False):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
 
@@ -71,16 +71,25 @@ def generate_physical_values(source_value, incidence_matrix):
     conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
     length_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
 
-    source_list = np.zeros(dimension)             # vector from nodes space
-    source_list[0] = source_value
-    source_list[dimension-1] = -source_value
-    #print("SOURCE", source_list)
 
-    """
-    # source for square lattice
-    if dimension %2 != 0:
-    
-    """
+    # source in one node on the left and sink in one node on the right -- resulting in a corridor between them
+    if corridor_model:
+        source_list = np.zeros(dimension)             # vector from nodes space
+        source_list[0] = source_value
+        source_list[dimension-1] = -source_value
+        #print("SOURCE", source_list)
+    # source for square lattice -- eye retina model
+
+    if square and dimension % 2 != 0:
+        source_list = np.zeros(dimension)             # vector from nodes space
+        source_list[int((dimension-1)/2)] = source_value             # source in the center
+
+        iterator = 0
+        for x, y in graph.nodes:        # accessing nodes on the border of the network
+            if x == 0 or x == dimension-1:
+                source_list[iterator] = -source_value/(np.sqrt(dimension))
+        iterator += 1
+
 
     # q = (delta^T)^-1 * S
     flow_list = np.dot(source_list, incidence_T_inv)
@@ -193,17 +202,22 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
 
 def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
                      pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
-                     a, b, gamma, delta, flow_hat, c, r, dt, N):
+                     a, b, gamma, delta, nu, flow_hat, c, r, dt, N, is_scaled=False):
     # solving diff eq
-    # without scaling factors
     # exp(r*t/2)^(delta)
     # np.exp(r*t*delta/2)
+    t = 0
 
-
+    # implementing scaling factors
+    if is_scaled:
+        source_list = source_list * np.exp(r*t*delta/2)
+        pressure_list = pressure_list * np.exp(r*t*nu/2)
+        length_list = length_list * np.exp(r*t/2)
+        conductivity_list = conductivity_list * np.exp(r*t*delta*gamma)
+        flow_list = flow_list * np.exp(r*t*delta/2)
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
 
-    t = 0
     for n in range(1, N+1):
         t += dt
 
@@ -240,9 +254,9 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
 
 
 def draw_graph(graph, name, pos, conductivity_list, flow_list, n):
-    #nx.draw_networkx(graph, pos=pos)
+    nx.draw_networkx(graph, pos=pos)
     nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
-    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list )  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
+    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list) #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
 
     plt.axis('off')
     plt.savefig("%s.png" % name)

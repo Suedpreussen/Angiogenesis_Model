@@ -5,11 +5,11 @@ import numpy as np
 
 start_time = time.time()
 
-hexagonal = True
+hexagonal = False
 triangular = False
-n = 4
+n = 5
 number_of_nodes = n*n
-adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
+#adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
 #incidence_matrix, graph, nodes_data, edges_data = an.generate_graph(adjacency_matrix)
 
@@ -17,7 +17,7 @@ adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(n, n, hexagonal=hexagonal, triangular=triangular)
 source_value = 10
 incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list = \
-    an.generate_physical_values(source_value, incidence_matrix)
+    an.generate_physical_values(graph, source_value, incidence_matrix)
 
 arguments = {'pressure_list': pressure_list, 'length_list': length_list, 'conductivity_list': conductivity_list,
              'flow_list': flow_list, 'pressure_diff_list': pressure_diff_list, 'incidence_matrix': incidence_matrix,
@@ -40,7 +40,7 @@ an.checking_Kirchhoffs_law(graph, source_list)
 an.draw_graph(graph, "graph", pos, conductivity_list, flow_list, n)
 print(edges_data)
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 1.9, 'b': 1.3, 'gamma': 2/3, 'delta': 2, 'flow_hat': 3.1, 'c': 0.001, 'r': 1.1, 'dt': 0.1, 'N': 10000}
+parameters_set = {'a': 3.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 5.1, 'c': 0.001, 'r': 0, 'dt': 0.01, 'N': 1000}
 an.run_simulation(nodes_data, edges_data, **arguments, **parameters_set)
 print(edges_data)
 an.draw_graph(graph, "final_graph", pos, conductivity_list, flow_list, n)
