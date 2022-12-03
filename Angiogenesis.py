@@ -55,7 +55,7 @@ def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=True, square=False):
+def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, square=False):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
 
@@ -78,8 +78,8 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         source_list[0] = source_value
         source_list[dimension-1] = -source_value
         #print("SOURCE", source_list)
-    # source for square lattice -- eye retina model
 
+    # source for square lattice -- eye retina model
     if square and dimension % 2 != 0:
         source_list = np.zeros(dimension)             # vector from nodes space
         source_list[int((dimension-1)/2)] = source_value             # source in the center
@@ -88,8 +88,8 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         for x, y in graph.nodes:        # accessing nodes on the border of the network
             if x == 0 or x == dimension-1:
                 source_list[iterator] = -source_value/(np.sqrt(dimension))
+                print(x, y)
         iterator += 1
-
 
     # q = (delta^T)^-1 * S
     flow_list = np.dot(source_list, incidence_T_inv)
@@ -101,8 +101,6 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
 
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
-
-
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
 
     return incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
@@ -236,7 +234,6 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
         conductivity_list += dK
 
         x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
-
         x_dagger = np.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
 
         # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
@@ -251,12 +248,13 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', t, ' seconds')
     update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
+    return conductivity_list
 
 
 def draw_graph(graph, name, pos, conductivity_list, flow_list, n):
     nx.draw_networkx(graph, pos=pos)
     nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
-    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list) #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
+    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
 
     plt.axis('off')
     plt.savefig("%s.png" % name)
