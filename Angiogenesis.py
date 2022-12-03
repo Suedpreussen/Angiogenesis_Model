@@ -85,15 +85,19 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         source_list[int((dimension-1)/2)] = source_value             # source in the center
 
         iterator = 0
-        for x, y in graph.nodes:        # accessing nodes on the border of the network
-            if x == 0 or x == dimension-1:
-                source_list[iterator] = -source_value/(np.sqrt(dimension))
-                print(x, y)
-        iterator += 1
+        for node in graph.nodes:        # accessing nodes on the border of the network
+            if node[0] == 0 or node[0] == np.sqrt(dimension) - 1 or node[1] == 0 or node[1] == np.sqrt(dimension) - 1:
+                source_list[iterator] = -source_value/(4*np.sqrt(dimension)-4)  # number of nodes on the border
+                #print(node)
+               # print(node[0], node[1])
+              #  print(iterator)
+            iterator += 1
+       # print(-source_value / (4*np.sqrt(dimension)-4))
 
     # q = (delta^T)^-1 * S
+    print(incidence_T_inv)
     flow_list = np.dot(source_list, incidence_T_inv)
-    #print("FLOW", flow_list)
+    print("FLOW", flow_list)
 
     # delta*p = K/L * q
     pressure_diff_list = flow_list * length_list * (1/conductivity_list)
@@ -167,6 +171,7 @@ def checking_Murrays_law():
 
 
 def checking_Kirchhoffs_law(graph, source_list):
+    print(source_list)
     index = 0
     successful_nodes = 0
     for node in graph.nodes(data=False):
@@ -174,12 +179,14 @@ def checking_Kirchhoffs_law(graph, source_list):
         for edge in graph.edges(node):
             sum += graph[edge[0]][edge[1]]['flow']
         if -1e-11 < sum - source_list[index] < 1e-11:
-            #print("Kirchhoff's law at node {} fulfilled".format(node))
+            print("Kirchhoff's law at node {} fulfilled".format(node))
             successful_nodes += 1
         else:
-            print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum - source_list[index])
+            pass
+            #print(sum, '  |', source_list[index])
+            #print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum - source_list[index])
         index += 1
-    print(successful_nodes, graph.number_of_nodes())
+    print("number of nodes fulfilling K's law:", successful_nodes, 'out of', graph.number_of_nodes())
     if successful_nodes == graph.number_of_nodes():
         print("SUCCESS! Kirchhoff's law fulfilled!")
 
@@ -248,7 +255,7 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', t, ' seconds')
     update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
-    return conductivity_list
+    return graph, conductivity_list
 
 
 def draw_graph(graph, name, pos, conductivity_list, flow_list, n):

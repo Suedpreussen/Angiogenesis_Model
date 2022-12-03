@@ -7,7 +7,7 @@ start_time = time.time()
 
 hexagonal = False
 triangular = False
-n = 5
+n = 3
 number_of_nodes = n*n
 #adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
@@ -40,12 +40,12 @@ an.checking_Kirchhoffs_law(graph, source_list)
 an.draw_graph(graph, "graph", pos, conductivity_list, flow_list, n)
 print(edges_data)
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 3.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 5.1, 'c': 0.001, 'r': 2, 'dt': 0.1, 'N': 100000}
-conductivity_list = an.run_simulation(nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True)
+parameters_set = {'a': 3.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 5.1, 'c': 0.001, 'r': 2, 'dt': 0.1, 'N': 1000}
+
+graph, conductivity_list = an.run_simulation(nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True)
 print(edges_data)
 an.draw_graph(graph, "final_graph", pos, conductivity_list, flow_list, n)
 an.checking_Kirchhoffs_law(graph, source_list)
-
 
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
