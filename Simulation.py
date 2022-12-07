@@ -5,9 +5,10 @@ import numpy as np
 
 start_time = time.time()
 
-hexagonal = False
-triangular = False
-n = 3
+hexagonal = 0
+triangular = 0
+
+n = 18
 number_of_nodes = n*n
 #adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
@@ -15,9 +16,11 @@ number_of_nodes = n*n
 
 # generate lattice
 incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(n, n, hexagonal=hexagonal, triangular=triangular)
+#graph.remove
+
 source_value = 10
 incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list = \
-    an.generate_physical_values(graph, source_value, incidence_matrix, square=True)
+    an.generate_physical_values(graph, source_value, incidence_matrix, corridor_model=0, two_capacitor_plates_model=1, triangular=triangular)
 
 arguments = {'pressure_list': pressure_list, 'length_list': length_list, 'conductivity_list': conductivity_list,
              'flow_list': flow_list, 'pressure_diff_list': pressure_diff_list, 'incidence_matrix': incidence_matrix,
@@ -40,7 +43,7 @@ an.checking_Kirchhoffs_law(graph, source_list)
 an.draw_graph(graph, "graph", pos, conductivity_list, flow_list, n)
 print(edges_data)
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 3.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 5.1, 'c': 0.001, 'r': 2, 'dt': 0.1, 'N': 1000}
+parameters_set = {'a': 2.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 2.1, 'c': 0.0001, 'r': 2, 'dt': 0.1, 'N': 1000}
 
 graph, conductivity_list = an.run_simulation(nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True)
 print(edges_data)

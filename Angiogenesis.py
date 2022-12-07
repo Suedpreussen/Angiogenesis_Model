@@ -36,11 +36,11 @@ unused code sent to Utils file
 """
 
 
-def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
+def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangular=False):
     if hexagonal:
-        graph = nx.hexagonal_lattice_graph(dim_A, dim_B, periodic=False)
+        graph = nx.hexagonal_lattice_graph(dim_A, dim_B, periodic=periodic)
     elif triangular:
-        graph = nx.triangular_lattice_graph(dim_A, dim_B, periodic=False)
+        graph = nx.triangular_lattice_graph(dim_A, dim_B, periodic=periodic)
     else:
         graph = nx.grid_graph(dim=(dim_A, dim_B))
     inc_mtx = nx.incidence_matrix(graph)
@@ -55,7 +55,7 @@ def generate_grid_graph(dim_A, dim_B, hexagonal=False, triangular=False):
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, square=False):
+def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, two_capacitor_plates_model=False, square=False, triangular=False):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
 
@@ -67,37 +67,85 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     #print(np.allclose(incidence_T_inv @ incidence_T @ incidence_T_inv, incidence_T_inv))
     #print(np.allclose(incidence_T @ incidence_T_inv @ incidence_T, incidence_T))
 
-    eps = 0.01
+    eps = 0.5
     conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
-    length_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
+    length_list = np.ones(edges_dim) # + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
 
 
     # source in one node on the left and sink in one node on the right -- resulting in a corridor between them
     if corridor_model:
         source_list = np.zeros(dimension)             # vector from nodes space
-        source_list[0] = source_value
-        source_list[dimension-1] = -source_value
+        source_list[int(np.sqrt(dimension)/2)-1] = source_value
+        source_list[dimension-int(np.sqrt(dimension)/2)] = -source_value
+        print(dimension)
+        print(int(np.sqrt(dimension)/2)-1)
+        print(dimension-int(np.sqrt(dimension)/2))
         #print("SOURCE", source_list)
 
-    # source for square lattice -- eye retina model
-    if square and dimension % 2 != 0:
-        source_list = np.zeros(dimension)             # vector from nodes space
-        source_list[int((dimension-1)/2)] = source_value             # source in the center
 
+    if two_capacitor_plates_model:
+        source_list = np.zeros(dimension)             # vector from nodes space
+        last_index = int(np.sqrt(dimension)-1)
+        half_nodes_on_one_side = int(np.sqrt(dimension)/2)
+        iterator = 0
+        for iterator in range(0, last_index+1, 2):
+            source_list[iterator] = source_value/half_nodes_on_one_side
+            source_list[dimension-1-iterator] = -source_value/half_nodes_on_one_side
+            iterator += 1
+        print(dimension)
+        print(last_index)
+        print(half_nodes_on_one_side)
+
+
+    """
+    # source for square lattice -- eye retina model
+    if square:
+        source_list = np.zeros(dimension)                            # vector from nodes space
+        source_list[int((dimension-1)/2)] = source_value             # source in the center
+        number_of_bordering_nodes = 4*np.sqrt(dimension)-4
+        last_index = int(np.sqrt(dimension)-1)
         iterator = 0
         for node in graph.nodes:        # accessing nodes on the border of the network
-            if node[0] == 0 or node[0] == np.sqrt(dimension) - 1 or node[1] == 0 or node[1] == np.sqrt(dimension) - 1:
-                source_list[iterator] = -source_value/(4*np.sqrt(dimension)-4)  # number of nodes on the border
-                #print(node)
-               # print(node[0], node[1])
-              #  print(iterator)
+            if node[0] == 0 or node[0] == last_index or  node[1] == 0 or node[1] == last_index:
+                source_list[iterator] = source_value/number_of_bordering_nodes  # number of nodes on the border
+                print(node)
             iterator += 1
        # print(-source_value / (4*np.sqrt(dimension)-4))
 
+    if triangular:
+        source_list = np.zeros(dimension)
+        source_list[int((dimension - 1) / 2)] = source_value
+        number_of_bordering_nodes = 12
+        last_index = int(np.sqrt(dimension) - 1)
+        iterator = 0
+        for node in graph.nodes:  # accessing nodes on the border of the network
+            if node[0] == 0 or node[0] == last_index or node[1] == 0 or node[1] == last_index:
+                source_list[iterator] = source_value / number_of_bordering_nodes  # number of nodes on the border
+                print(node)
+            iterator += 1
+
+
+    if side_to_side:
+        source_list = np.zeros(dimension)
+        last_index = int(np.sqrt(dimension)-1)
+        nodes_on_one_side = int(np.sqrt(dimension))
+        iterator = 0
+        for node in graph.nodes:
+            if node[0] == 0:    # in-flow side
+                source_list[iterator] = source_value / (2*nodes_on_one_side)
+                print("source", node)
+            elif node[0] == last_index:   # out-flow side
+                source_list[iterator] = -source_value / (2*nodes_on_one_side)
+                print("sink", node)
+
+            iterator += 1
+    """
+
+
     # q = (delta^T)^-1 * S
-    print(incidence_T_inv)
+    #print(incidence_T_inv)
     flow_list = np.dot(source_list, incidence_T_inv)
-    print("FLOW", flow_list)
+    #print("FLOW", flow_list)
 
     # delta*p = K/L * q
     pressure_diff_list = flow_list * length_list * (1/conductivity_list)
@@ -171,19 +219,20 @@ def checking_Murrays_law():
 
 
 def checking_Kirchhoffs_law(graph, source_list):
-    print(source_list)
+    #print(source_list)
     index = 0
     successful_nodes = 0
     for node in graph.nodes(data=False):
         sum = 0
         for edge in graph.edges(node):
             sum += graph[edge[0]][edge[1]]['flow']
-        if -1e-11 < sum - source_list[index] < 1e-11:
-            print("Kirchhoff's law at node {} fulfilled".format(node))
+        if -1e-10 < sum - source_list[index] < 1e-10:
+            #print("Kirchhoff's law at node {} fulfilled".format(node))
+            #print(sum, '    |', source_list[index], '    |', print(node))
             successful_nodes += 1
         else:
             pass
-            #print(sum, '  |', source_list[index])
+            print(sum, '|', source_list[index], '|', print(node))
             #print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum - source_list[index])
         index += 1
     print("number of nodes fulfilling K's law:", successful_nodes, 'out of', graph.number_of_nodes())
@@ -259,11 +308,17 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
 
 
 def draw_graph(graph, name, pos, conductivity_list, flow_list, n):
-    nx.draw_networkx(graph, pos=pos)
-    nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
-    nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
+    if len(conductivity_list) < 100:
+        nx.draw_networkx(graph, pos=pos)
+        nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
+        nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
+    else:
+        #nx.draw_networkx(graph, pos=pos)
+        nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 4))
 
     plt.axis('off')
+    plt.axis('scaled')
     plt.savefig("%s.png" % name)
     #plt.show()
     # nodes colour - heatmap of pressure
