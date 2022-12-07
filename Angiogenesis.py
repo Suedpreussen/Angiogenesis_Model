@@ -55,7 +55,7 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, two_capacitor_plates_model=False, square=False, triangular=False):
+def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, two_capacitor_plates_model=False, one_capacitor_plates_model=False, quater_model=False, square=False, triangular=False):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
 
@@ -96,6 +96,35 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         print(last_index)
         print(half_nodes_on_one_side)
 
+    if one_capacitor_plates_model:
+        source_list = np.zeros(dimension)             # vector from nodes space
+        last_index = int(np.sqrt(dimension)-1)
+        nodes_on_one_side = int(np.sqrt(dimension))
+        source_list[int(np.sqrt(dimension) / 2)] = source_value
+        iterator = 0
+        for iterator in range(0, last_index+1):
+            print(iterator)
+            source_list[dimension-1-iterator] = -source_value/nodes_on_one_side
+            iterator += 1
+        print(source_list)
+        print(dimension)
+        print(last_index)
+        print(nodes_on_one_side)
+
+    if quater_model:
+        source_list = np.zeros(dimension)  # vector from nodes space
+        last_index = int(np.sqrt(dimension) - 1)
+        half_nodes_on_one_side = 3 * int(np.sqrt(dimension) / 2)
+        source_list[0] = source_value
+        iterator = 0
+        for iterator in range(0, last_index + 1, 2):
+            source_list[dimension - 1 - iterator] = -source_value / half_nodes_on_one_side
+            source_list[last_index * (iterator + 1)] = -source_value / half_nodes_on_one_side
+            source_list[(last_index + 1) * (iterator + 1)] = -source_value / half_nodes_on_one_side
+            iterator += 1
+        print(dimension)
+        print(last_index)
+        print(half_nodes_on_one_side)
 
     """
     # source for square lattice -- eye retina model
@@ -226,7 +255,7 @@ def checking_Kirchhoffs_law(graph, source_list):
         sum = 0
         for edge in graph.edges(node):
             sum += graph[edge[0]][edge[1]]['flow']
-        if -1e-10 < sum - source_list[index] < 1e-10:
+        if -1e-5 < sum - source_list[index] < 1e-5:
             #print("Kirchhoff's law at node {} fulfilled".format(node))
             #print(sum, '    |', source_list[index], '    |', print(node))
             successful_nodes += 1
@@ -254,9 +283,9 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
         print("Constraint: ", constraint)
 
 
-def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
+def run_simulation(m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
                      pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
-                     a, b, gamma, delta, nu, flow_hat, c, r, dt, N, is_scaled=False):
+                     a, b, gamma, delta, nu, flow_hat, c, r, dt, N, is_scaled=False, with_pruning=False):
     # solving diff eq
     # exp(r*t/2)^(delta)
     # np.exp(r*t*delta/2)
@@ -271,19 +300,36 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
         flow_list = flow_list * np.exp(r*t*delta/2)
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
+    number_of_removed_edges = 0
+    number_of_removed_nodes = 0
 
     for n in range(1, N+1):
         t += dt
+        if n!= 0 and n!= N and n == N/2:
+            draw_graph(graph, "mid_graph", pos, conductivity_list, m)
 
         # pruning implementation
-        iter = 0
-        for e in graph.edges:
-            con_val = conductivity_list[iter]
-            #print(e, con_val)
-            if con_val < 1e-9:
-                graph.remove_edge(*e)
-                print(e, 'removed')
-            iter += 1
+        if with_pruning:
+            for edge in graph.edges:
+                con_val = graph.get_edge_data(*edge)["conductivity"]
+                #print(*edge, " | ", con_val)
+                if con_val < 1e-11:                 # removing an edge if its radius is ~= 0
+                    graph.remove_edge(*edge)
+                    print('edge', *edge, 'removed')
+                    number_of_removed_edges += 1
+
+            for node in dict(graph.nodes).copy():           # for reasons unknown I had to cast graph.nodes into dict
+                                                            # and use dictionary method copy() to get away with error
+                                                            # "RuntimeError: dictionary changed size during iteration"
+                                                            # but it with edges it worked just fine
+                neighbors = set(nx.neighbors(graph, node))
+                #print(len(neighbors))
+                if len(neighbors) == 0:
+                    graph.remove_node(node)
+                    print('node', node, 'removed')
+                    #pos = dict((m, m) for m in graph.nodes())
+                    number_of_removed_nodes += 1
+
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
         dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
@@ -303,11 +349,14 @@ def run_simulation(nodes_data, edges_data, x, x_dagger, incidence_T_inv, inciden
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', t, ' seconds')
+    print("number of removed edges: ", number_of_removed_edges)
+    print("number of removed nodes: ", number_of_removed_nodes)
+
     update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
     return graph, conductivity_list
 
 
-def draw_graph(graph, name, pos, conductivity_list, flow_list, n):
+def draw_graph(graph, name, pos, conductivity_list, n):
     if len(conductivity_list) < 100:
         nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
@@ -315,11 +364,12 @@ def draw_graph(graph, name, pos, conductivity_list, flow_list, n):
     else:
         #nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 4))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1))
 
     plt.axis('off')
     plt.axis('scaled')
     plt.savefig("%s.png" % name)
+    plt.clf()
     #plt.show()
     # nodes colour - heatmap of pressure
     # edges length - proportional to length
