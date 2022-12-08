@@ -7,7 +7,7 @@ start_time = time.time()
 
 hexagonal = 0
 triangular = 0
-m = 2
+m = 4
 number_of_nodes = m*m
 #adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
@@ -19,7 +19,7 @@ incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(m, m, h
 
 source_value = 10
 incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list = \
-    an.generate_physical_values(graph, source_value, incidence_matrix, corridor_model=0, two_capacitor_plates_model=1, one_capacitor_plates_model=0, quater_model=0, triangular=triangular)
+    an.generate_physical_values(graph, source_value, incidence_matrix, corridor_model=1, two_capacitor_plates_model=0, one_capacitor_plates_model=0, quater_model=0, triangular=triangular)
 
 arguments = {'pressure_list': pressure_list, 'length_list': length_list, 'conductivity_list': conductivity_list,
              'flow_list': flow_list, 'pressure_diff_list': pressure_diff_list, 'incidence_matrix': incidence_matrix,
@@ -38,7 +38,7 @@ else:
     pos = dict((n, n) for n in graph.nodes())   # square rigid layout
 
 
-an.checking_Kirchhoffs_law(graph, source_list)
+an.checking_Kirchhoffs_law(graph, source_list, flow_list)
 an.draw_graph(graph, "graph", pos, conductivity_list, m)
 print(edges_data)
 print(nodes_data)
@@ -50,7 +50,7 @@ graph, conductivity_list = an.run_simulation(source_value, m, pos, nodes_data, e
 print(edges_data)
 print(nodes_data)
 an.draw_graph(graph, "final_graph", pos, conductivity_list, m)
-an.checking_Kirchhoffs_law(graph, source_list)
+an.checking_Kirchhoffs_law(graph, source_list, flow_list)
 
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))

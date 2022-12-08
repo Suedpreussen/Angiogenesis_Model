@@ -271,16 +271,20 @@ def checking_Murrays_law():
     pass
 
 
-def checking_Kirchhoffs_law(graph, source_list):
+def checking_Kirchhoffs_law(graph, source_list, flow_list):
     #print(source_list)
     index = 0
     successful_nodes = 0
     for node in graph.nodes(data=False):
         sum = 0
-        print(node)
+        #print(node, "___________")
         for edge in graph.edges(node):
-            sum += graph[edge[0]][edge[1]]['flow']
-            print(edge, graph.get_edge_data(*edge)['flow'])
+            if np.sum(edge[0]) < np.sum(edge[1]):        # implementing direction of flow to the undirected graph
+                sum += graph[edge[0]][edge[1]]['flow']
+                #print(edge, '|',  np.sum(edge[0]), '|',  np.sum(edge[1]), '|',  graph.get_edge_data(*edge)['flow'])
+            else:
+                sum -= graph[edge[0]][edge[1]]['flow']
+                #print("ELSE", edge, '|',  np.sum(edge[0]), '|',  np.sum(edge[1]), '|',  -graph.get_edge_data(*edge)['flow'])
         if -1e-6 < sum - source_list[index] < 1e-6:
             #print("Kirchhoff's law at node {} fulfilled".format(node))
             #print(sum, '    |', source_list[index], '    |', print(node))
