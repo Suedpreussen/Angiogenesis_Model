@@ -99,12 +99,12 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     if one_capacitor_plates_model:
         source_list = np.zeros(dimension)             # vector from nodes space
         last_index = int(np.sqrt(dimension)-1)
-        nodes_on_one_side = int(np.sqrt(dimension))
-        source_list[int(np.sqrt(dimension) / 2)] = source_value
+        nodes_on_one_side = int(np.sqrt(dimension)/2)
+        source_list[int(np.sqrt(dimension) / 2) - 1] = source_value
         iterator = 0
-        for iterator in range(0, last_index+1):
+        for iterator in range(0, last_index+1, 2):
             print(iterator)
-            source_list[dimension-1-iterator] = -source_value/nodes_on_one_side
+            source_list[dimension-2-iterator] = -source_value/nodes_on_one_side
             iterator += 1
         print(source_list)
         print(dimension)
@@ -364,7 +364,7 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     else:
         #nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1)/7)
 
     plt.axis('off')
     plt.axis('scaled')
