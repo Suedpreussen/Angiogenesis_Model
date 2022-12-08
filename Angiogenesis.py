@@ -55,7 +55,8 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
 
-def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, two_capacitor_plates_model=False, one_capacitor_plates_model=False, quater_model=False, square=False, triangular=False):
+def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, two_capacitor_plates_model=False,
+                             one_capacitor_plates_model=False, three_sides_model=False, quater_model=False, square=False, triangular=False):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
 
@@ -83,18 +84,22 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         #print("SOURCE", source_list)
 
 
+
+
     if two_capacitor_plates_model:
         source_list = np.zeros(dimension)             # vector from nodes space
         last_index = int(np.sqrt(dimension)-1)
-        half_nodes_on_one_side = int(np.sqrt(dimension)/2)
+        nodes_on_one_side = int(np.sqrt(dimension))
         iterator = 0
-        for iterator in range(0, last_index+1, 2):
-            source_list[iterator] = source_value/half_nodes_on_one_side
-            source_list[dimension-1-iterator] = -source_value/half_nodes_on_one_side
+        for iterator in range(0, last_index+1):
+            source_list[iterator] = source_value/nodes_on_one_side
+            source_list[dimension-1-iterator] = -source_value/nodes_on_one_side
             iterator += 1
         print(dimension)
         print(last_index)
-        print(half_nodes_on_one_side)
+        print(nodes_on_one_side)
+
+
 
     if one_capacitor_plates_model:
         source_list = np.zeros(dimension)             # vector from nodes space
@@ -106,7 +111,22 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
             print(iterator)
             source_list[dimension-2-iterator] = -source_value/nodes_on_one_side
             iterator += 1
-        print(source_list)
+        #print(source_list)
+        print(dimension)
+        print(last_index)
+        print(nodes_on_one_side)
+
+    if three_sides_model:
+        source_list = np.zeros(dimension)             # vector from nodes space
+        last_index = int(np.sqrt(dimension)-1)
+        nodes_on_one_side = int(np.sqrt(dimension)/2)
+        source_list[int(np.sqrt(dimension) / 2) - 1] = source_value
+        iterator = 0
+        for iterator in range(0, last_index+1, 2):
+            print(iterator)
+            source_list[dimension-2-iterator] = -source_value/nodes_on_one_side
+            iterator += 1
+        #print(source_list)
         print(dimension)
         print(last_index)
         print(nodes_on_one_side)
@@ -174,6 +194,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     # q = (delta^T)^-1 * S
     #print(incidence_T_inv)
     flow_list = np.dot(source_list, incidence_T_inv)
+
     #print("FLOW", flow_list)
 
     # delta*p = K/L * q
@@ -187,15 +208,17 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     return incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
 
 
-def update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time = False):
+def update_df(source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time = False):
     # update data frames for both spaces
     if first_time:
         if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
             nodes_data.columns = ['nodes']
             nodes_data['pressure'] = pressure_list
+            nodes_data['source'] = source_list
         elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
             nodes_data.columns = ['no-', '-des']
             nodes_data['pressure'] = pressure_list
+            nodes_data['source'] = source_list
         #print(nodes_data)
         edges_data.columns = ['ed-', '-ges']
         edges_data['length'] = length_list
@@ -210,6 +233,7 @@ def update_df(pressure_list, length_list, conductivity_list, flow_list, pressure
         edges_data['press_diff'] = pressure_diff_list
         #print(edges_data)
         nodes_data['pressure'] = pressure_list
+        nodes_data['source'] = source_list
         #print(nodes_data)
 
 
@@ -253,9 +277,11 @@ def checking_Kirchhoffs_law(graph, source_list):
     successful_nodes = 0
     for node in graph.nodes(data=False):
         sum = 0
+        print(node)
         for edge in graph.edges(node):
             sum += graph[edge[0]][edge[1]]['flow']
-        if -1e-5 < sum - source_list[index] < 1e-5:
+            print(edge, graph.get_edge_data(*edge)['flow'])
+        if -1e-6 < sum - source_list[index] < 1e-6:
             #print("Kirchhoff's law at node {} fulfilled".format(node))
             #print(sum, '    |', source_list[index], '    |', print(node))
             successful_nodes += 1
@@ -283,13 +309,22 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
         print("Constraint: ", constraint)
 
 
-def run_simulation(m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
+def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
                      pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
                      a, b, gamma, delta, nu, flow_hat, c, r, dt, N, is_scaled=False, with_pruning=False):
     # solving diff eq
     # exp(r*t/2)^(delta)
     # np.exp(r*t*delta/2)
     t = 0
+
+    # two control parameters
+    rho = b/(r*gamma*delta)   # the ratio between the time scales for adaptation and growth
+    print("RHO: ", rho)
+
+    source_hat = source_value
+    kappa = (c/a)*np.float_power((flow_hat/source_hat), 2*gamma)  # a/c is the ratio between background growth rate and adaptation strength and the hatted quantities are typical scales for flow and source strength.
+    print("KAPPA: ", kappa)
+
 
     # implementing scaling factors
     if is_scaled:
@@ -298,6 +333,7 @@ def run_simulation(m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv,
         length_list = length_list * np.exp(r*t/2)
         conductivity_list = conductivity_list * np.exp(r*t*delta*gamma)
         flow_list = flow_list * np.exp(r*t*delta/2)
+        b = b + r*gamma*delta
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     number_of_removed_edges = 0
@@ -352,7 +388,7 @@ def run_simulation(m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv,
     print("number of removed edges: ", number_of_removed_edges)
     print("number of removed nodes: ", number_of_removed_nodes)
 
-    update_df(pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
+    update_df(source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
     return graph, conductivity_list
 
 
@@ -364,7 +400,7 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     else:
         #nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1)/7)
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4))
 
     plt.axis('off')
     plt.axis('scaled')
