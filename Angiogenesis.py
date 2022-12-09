@@ -76,11 +76,11 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     # source in one node on the left and sink in one node on the right -- resulting in a corridor between them
     if corridor_model:
         source_list = np.zeros(dimension)             # vector from nodes space
-        source_list[int(np.sqrt(dimension)/2)-1] = source_value
-        source_list[dimension-int(np.sqrt(dimension)/2)] = -source_value
-        print(dimension)
-        print(int(np.sqrt(dimension)/2)-1)
-        print(dimension-int(np.sqrt(dimension)/2))
+        source_list[0] = source_value
+        source_list[dimension-1] = -source_value
+        #print(dimension)
+        #print(int(np.sqrt(dimension)/2)-1)
+        #print(dimension-int(np.sqrt(dimension)/2))
         #print("SOURCE", source_list)
 
 
@@ -285,14 +285,14 @@ def checking_Kirchhoffs_law(graph, source_list, flow_list):
             else:
                 sum -= graph[edge[0]][edge[1]]['flow']
                 #print("ELSE", edge, '|',  np.sum(edge[0]), '|',  np.sum(edge[1]), '|',  -graph.get_edge_data(*edge)['flow'])
-        if -1e-6 < sum - source_list[index] < 1e-6:
+        if -1e-6 < sum + source_list[index] < 1e-6:
             #print("Kirchhoff's law at node {} fulfilled".format(node))
             #print(sum, '    |', source_list[index], '    |', print(node))
             successful_nodes += 1
         else:
             pass
             print(sum, '|', source_list[index], '|', print(node))
-            #print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum - source_list[index])
+            #print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum + source_list[index])
         index += 1
     print("number of nodes fulfilling K's law:", successful_nodes, 'out of', graph.number_of_nodes())
     if successful_nodes == graph.number_of_nodes():
@@ -321,6 +321,8 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     # np.exp(r*t*delta/2)
     t = 0
 
+
+
     # two control parameters
     rho = b/(r*gamma*delta)   # the ratio between the time scales for adaptation and growth
     print("RHO: ", rho)
@@ -343,6 +345,8 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     number_of_removed_edges = 0
     number_of_removed_nodes = 0
 
+    lagrange_multiplier = 2
+    flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma +1)*np.float_power(conductivity_list, 1/(2*gamma))
     for n in range(1, N+1):
         t += dt
         if n!= 0 and n!= N and n == N/2:
@@ -361,7 +365,7 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
             for node in dict(graph.nodes).copy():           # for reasons unknown I had to cast graph.nodes into dict
                                                             # and use dictionary method copy() to get away with error
                                                             # "RuntimeError: dictionary changed size during iteration"
-                                                            # but it with edges it worked just fine
+                                                            # but with edges it worked just fine
                 neighbors = set(nx.neighbors(graph, node))
                 #print(len(neighbors))
                 if len(neighbors) == 0:
@@ -372,7 +376,8 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
 
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+        #dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+        dK = dt * (np.float_power(a * (np.abs(flow_from_lagrange_optimisation) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
         conductivity_list += dK
 
         x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
@@ -387,6 +392,10 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         # updating data in graph dics
         set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
 
+        #dEdF_lam_dgdF = np.sum(flow_list) / np.sum(conductivity_list)    # checking first eq from lagrange optimisation
+        #print(dEdF_lam_dgdF)
+
+
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', t, ' seconds')
     print("number of removed edges: ", number_of_removed_edges)
@@ -398,9 +407,14 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
 
 def draw_graph(graph, name, pos, conductivity_list, n):
     if len(conductivity_list) < 100:
-        nx.draw_networkx(graph, pos=pos)
-        nx.draw_networkx_nodes(graph, pos=pos, node_size=300/(2*n))
-        nx.draw_networkx_edges(graph, pos=pos, width=conductivity_list)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
+        labels = nx.get_edge_attributes(graph, 'flow')
+        for key, val in labels.items():
+            new_val = round(val, 2)
+            labels[key] = new_val
+        nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels, rotate=False, font_color='red')
+        nx.draw_networkx(graph, pos=pos, node_size=400/(n))
+        nx.draw_networkx_nodes(graph, pos=pos, node_size=400/(n))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4))  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
     else:
         #nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
