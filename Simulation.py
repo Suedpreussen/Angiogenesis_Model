@@ -7,14 +7,14 @@ start_time = time.time()
 
 hexagonal = 0
 triangular = 0
-m = 1
+m = 5
 number_of_nodes = m*m
 #adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
 #incidence_matrix, graph, nodes_data, edges_data = an.generate_graph(adjacency_matrix)
 
 # generate lattice
-incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(m, 2*m, hexagonal=hexagonal, triangular=triangular)
+incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(m, m, hexagonal=hexagonal, triangular=triangular)
 #graph.remove
 
 source_value = 2
@@ -44,7 +44,7 @@ print(edges_data)
 print(nodes_data)
 
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 2.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 1.1, 'c': 0.01, 'r': 1.1, 'dt': 0.01, 'N': 40}
+parameters_set = {'a': 2.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.1, 'nu': 1.1, 'flow_hat': 1.1, 'c': 0.001, 'r': 1.1, 'dt': 0.01, 'N': 4000}
 
 graph, conductivity_list = an.run_simulation(source_value, m, pos, nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True, with_pruning=False)
 print(edges_data)

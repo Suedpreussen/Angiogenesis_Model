@@ -46,6 +46,21 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
     inc_mtx = nx.incidence_matrix(graph)
     inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
     inc_mtx_dense_int = inc_mtx_dense.astype(int)
+
+    # change inc_mtx to a directed one
+    for row in inc_mtx_dense_int.T:
+        ones_count = 0
+        row_element_count = 0
+        for element in row:
+            if element == 1:
+                ones_count += 1
+                print("el", element)
+                print("c", ones_count)
+                if ones_count == 2:
+                    row[row_element_count] *= -1
+                    print("asas")
+            row_element_count +=1
+
     #print(np.shape(inc_mtx_dense_int))
     #print(np.shape(nx.adjacency_matrix(graph)))
     nodes_list = graph.nodes()
@@ -63,7 +78,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     incidence_T = incidence_matrix.transpose()
     incidence_T_inv = np.linalg.pinv(incidence_T)
     incidence_inv = np.linalg.pinv(incidence_matrix)
-
+    print(incidence_matrix)
     # checking moore-penrose inverse definition
     #print(np.allclose(incidence_T_inv @ incidence_T @ incidence_T_inv, incidence_T_inv))
     #print(np.allclose(incidence_T @ incidence_T_inv @ incidence_T, incidence_T))
@@ -285,7 +300,7 @@ def checking_Kirchhoffs_law(graph, source_list, flow_list):
             else:
                 sum -= graph[edge[0]][edge[1]]['flow']
                 #print("ELSE", edge, '|',  np.sum(edge[0]), '|',  np.sum(edge[1]), '|',  -graph.get_edge_data(*edge)['flow'])
-        if -1e-6 < sum + source_list[index] < 1e-6:
+        if -1e-11 < sum - source_list[index] < 1e-11:
             #print("Kirchhoff's law at node {} fulfilled".format(node))
             #print(sum, '    |', source_list[index], '    |', print(node))
             successful_nodes += 1
@@ -345,7 +360,7 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     number_of_removed_edges = 0
     number_of_removed_nodes = 0
 
-    lagrange_multiplier = 2
+    lagrange_multiplier = 0.000001
     flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma +1)*np.float_power(conductivity_list, 1/(2*gamma))
     for n in range(1, N+1):
         t += dt
@@ -376,8 +391,8 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
 
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-        #dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
-        dK = dt * (np.float_power(a * (np.abs(flow_from_lagrange_optimisation) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+        dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+        #dK = dt * (np.float_power(a * (np.abs(flow_from_lagrange_optimisation) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
         conductivity_list += dK
 
         x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
