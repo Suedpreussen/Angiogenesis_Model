@@ -54,11 +54,11 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
         for element in row:
             if element == 1:
                 ones_count += 1
-                print("el", element)
-                print("c", ones_count)
+                #print("el", element)
+                #print("c", ones_count)
                 if ones_count == 2:
                     row[row_element_count] *= -1
-                    print("asas")
+                    #print("asas")
             row_element_count +=1
 
     #print(np.shape(inc_mtx_dense_int))
@@ -78,12 +78,12 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     incidence_T = incidence_matrix.transpose()
     incidence_T_inv = np.linalg.pinv(incidence_T)
     incidence_inv = np.linalg.pinv(incidence_matrix)
-    print(incidence_matrix)
+    #print(incidence_matrix)
     # checking moore-penrose inverse definition
     #print(np.allclose(incidence_T_inv @ incidence_T @ incidence_T_inv, incidence_T_inv))
     #print(np.allclose(incidence_T @ incidence_T_inv @ incidence_T, incidence_T))
 
-    eps = 0.5
+    eps = 0.99
     conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
     length_list = np.ones(edges_dim) # + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
 
@@ -163,7 +163,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
 
     """
     # source for square lattice -- eye retina model
-    if square:
+    if square_:
         source_list = np.zeros(dimension)                            # vector from nodes space
         source_list[int((dimension-1)/2)] = source_value             # source in the center
         number_of_bordering_nodes = 4*np.sqrt(dimension)-4
@@ -355,6 +355,7 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         conductivity_list = conductivity_list * np.exp(r*t*delta*gamma)
         flow_list = flow_list * np.exp(r*t*delta/2)
         b = b + r*gamma*delta
+        c = c * np.exp(-r*t*gamma*delta)
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     number_of_removed_edges = 0
@@ -429,11 +430,11 @@ def draw_graph(graph, name, pos, conductivity_list, n):
         nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels, rotate=False, font_color='red')
         nx.draw_networkx(graph, pos=pos, node_size=400/(n))
         nx.draw_networkx_nodes(graph, pos=pos, node_size=400/(n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4))  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
     else:
         #nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1)*4)
 
     plt.axis('off')
     plt.axis('scaled')
