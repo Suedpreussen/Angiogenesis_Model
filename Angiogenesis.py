@@ -83,7 +83,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     #print(np.allclose(incidence_T_inv @ incidence_T @ incidence_T_inv, incidence_T_inv))
     #print(np.allclose(incidence_T @ incidence_T_inv @ incidence_T, incidence_T))
 
-    eps = 0.99
+    eps = 0.9
     conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
     length_list = np.ones(edges_dim) # + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
 
@@ -98,9 +98,6 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         #print(dimension-int(np.sqrt(dimension)/2))
         #print("SOURCE", source_list)
 
-
-
-
     if two_capacitor_plates_model:
         source_list = np.zeros(dimension)             # vector from nodes space
         last_index = int(np.sqrt(dimension)-1)
@@ -113,8 +110,6 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         print(dimension)
         print(last_index)
         print(nodes_on_one_side)
-
-
 
     if one_capacitor_plates_model:
         source_list = np.zeros(dimension)             # vector from nodes space
@@ -130,37 +125,6 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         print(dimension)
         print(last_index)
         print(nodes_on_one_side)
-
-    if three_sides_model:
-        source_list = np.zeros(dimension)             # vector from nodes space
-        last_index = int(np.sqrt(dimension)-1)
-        nodes_on_one_side = int(np.sqrt(dimension)/2)
-        source_list[int(np.sqrt(dimension) / 2) - 1] = source_value
-        iterator = 0
-        for iterator in range(0, last_index+1, 2):
-            print(iterator)
-            source_list[dimension-2-iterator] = -source_value/nodes_on_one_side
-            iterator += 1
-        #print(source_list)
-        print(dimension)
-        print(last_index)
-        print(nodes_on_one_side)
-
-    if quater_model:
-        source_list = np.zeros(dimension)  # vector from nodes space
-        last_index = int(np.sqrt(dimension) - 1)
-        half_nodes_on_one_side = 3 * int(np.sqrt(dimension) / 2)
-        source_list[0] = source_value
-        iterator = 0
-        for iterator in range(0, last_index + 1, 2):
-            source_list[dimension - 1 - iterator] = -source_value / half_nodes_on_one_side
-            source_list[last_index * (iterator + 1)] = -source_value / half_nodes_on_one_side
-            source_list[(last_index + 1) * (iterator + 1)] = -source_value / half_nodes_on_one_side
-            iterator += 1
-        print(dimension)
-        print(last_index)
-        print(half_nodes_on_one_side)
-
 
     # source for square lattice -- eye retina model
     # works only for odd number of rows/columns -- only then a central node exists
@@ -179,11 +143,11 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         print(-source_value / (4*np.sqrt(dimension)-4) * iterator)
         print(source_value)
 
-    """
+
     if triangular:
         source_list = np.zeros(dimension)
         source_list[int((dimension - 1) / 2)] = source_value
-        number_of_bordering_nodes = 12
+        number_of_bordering_nodes = 16
         last_index = int(np.sqrt(dimension) - 1)
         iterator = 0
         for node in graph.nodes:  # accessing nodes on the border of the network
@@ -192,7 +156,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
                 print(node)
             iterator += 1
 
-
+    """
     if side_to_side:
         source_list = np.zeros(dimension)
         last_index = int(np.sqrt(dimension)-1)
@@ -438,7 +402,7 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     else:
         #nx.draw_networkx(graph, pos=pos)
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1)*4)
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)
 
     plt.axis('off')
     plt.axis('scaled')
