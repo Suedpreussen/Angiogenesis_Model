@@ -71,7 +71,7 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
 
 
 def generate_physical_values(graph, source_value, incidence_matrix, corridor_model=False, two_capacitor_plates_model=False,
-                             one_capacitor_plates_model=False, three_sides_model=False, quater_model=False, square_concentric_model=False, triangular=False):
+                             one_capacitor_plates_model=False, three_sides_model=False, quater_model=False, square_concentric_model=False, veins_square_concentric_model=False , triangular=False):
     dimension = np.shape(incidence_matrix)[0]
     edges_dim = np.shape(incidence_matrix)[1]
 
@@ -139,10 +139,18 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
                 source_list[iterator] = -source_value/number_of_boundary_nodes
                 #print(node)
             iterator += 1
-        print(number_of_boundary_nodes)
-        print(-source_value / (4*np.sqrt(dimension)-4) * iterator)
-        print(source_value)
 
+    if veins_square_concentric_model:
+        source_list = np.zeros(dimension)                            # vector from nodes space
+        source_list[int((dimension-1)/2)] = -source_value             # source in the center
+        number_of_boundary_nodes = 4*np.sqrt(dimension)-4
+        last_index = int(np.sqrt(dimension)-1)
+        iterator = 0
+        for node in graph.nodes:        # accessing nodes on the boundaries of the network
+            if node[0] == 0 or node[0] == last_index or node[1] == 0 or node[1] == last_index:
+                source_list[iterator] = source_value/number_of_boundary_nodes
+                #print(node)
+            iterator += 1
 
     if triangular:
         source_list = np.zeros(dimension)
@@ -155,24 +163,6 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
                 source_list[iterator] = source_value / number_of_bordering_nodes  # number of nodes on the border
                 print(node)
             iterator += 1
-
-    """
-    if side_to_side:
-        source_list = np.zeros(dimension)
-        last_index = int(np.sqrt(dimension)-1)
-        nodes_on_one_side = int(np.sqrt(dimension))
-        iterator = 0
-        for node in graph.nodes:
-            if node[0] == 0:    # in-flow side
-                source_list[iterator] = source_value / (2*nodes_on_one_side)
-                print("source", node)
-            elif node[0] == last_index:   # out-flow side
-                source_list[iterator] = -source_value / (2*nodes_on_one_side)
-                print("sink", node)
-
-            iterator += 1
-    """
-
 
     # q = (delta^T)^-1 * S
     #print(incidence_T_inv)

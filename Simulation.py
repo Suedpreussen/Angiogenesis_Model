@@ -7,7 +7,7 @@ start_time = time.time()
 
 hexagonal = 0
 triangular = 0
-m = 39
+m = 21
 number_of_nodes = m*m
 #adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
@@ -19,7 +19,7 @@ incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(m, m, h
 
 source_value = 10
 incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list = \
-    an.generate_physical_values(graph, source_value, incidence_matrix, corridor_model=0, two_capacitor_plates_model=0, square_concentric_model=1, triangular=0)
+    an.generate_physical_values(graph, source_value, incidence_matrix, corridor_model=0, two_capacitor_plates_model=0, square_concentric_model=0, veins_square_concentric_model=1, triangular=0)
 
 arguments = {'pressure_list': pressure_list, 'length_list': length_list, 'conductivity_list': conductivity_list,
              'flow_list': flow_list, 'pressure_diff_list': pressure_diff_list, 'incidence_matrix': incidence_matrix,
@@ -44,7 +44,7 @@ print(edges_data)
 print(nodes_data)
 
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 2.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.7, 'nu': 1.1, 'flow_hat': 1.1, 'c': 0.001, 'r': 1.7, 'dt': 0.001, 'N': 8000}
+parameters_set = {'a': 2.9, 'b': 1.3, 'gamma': 2/3, 'delta': 1.7, 'nu': 1.1, 'flow_hat': 1.1, 'c': 0.001, 'r': 1.7, 'dt': 0.001, 'N': 4000}
 
 graph, conductivity_list = an.run_simulation(source_value, m, pos, nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True, with_pruning=False)
 print(edges_data)
