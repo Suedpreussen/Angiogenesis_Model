@@ -324,6 +324,7 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         flow_list = flow_list * np.exp(r*t*delta/2)
         b = b + r*gamma*delta
         c = c * np.exp(-r*t*gamma*delta)
+        print("time unit: ", 1/b)
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     number_of_removed_edges = 0
@@ -333,8 +334,8 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma +1)*np.float_power(conductivity_list, 1/(2*gamma))
     for n in range(1, N+1):
         t += dt
-        if n!= 0 and n!= N and n == N/2:
-            draw_graph(graph, "mid_graph", pos, conductivity_list, m)
+        if n!= 0 and n!= N and n == N/4 or n == N/2 or n == (3*N)/4:
+            draw_graph(graph, f"graph_at_{n/N}", pos, conductivity_list, m)
 
         # pruning implementation
         if with_pruning:
@@ -381,7 +382,7 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
 
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
-    print('simulation time: ', t, ' seconds')
+    print('simulation time: ', round(t*b, 3), "1/(b')  =  ", round(t, 3), "seconds")
     print("number of removed edges: ", number_of_removed_edges)
     print("number of removed nodes: ", number_of_removed_nodes)
 
