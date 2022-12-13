@@ -43,6 +43,32 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
         graph = nx.triangular_lattice_graph(dim_A, dim_B, periodic=periodic)
     else:
         graph = nx.grid_graph(dim=(dim_A, dim_B))
+
+    # deleting the boundary ring of edges
+    """
+    last_index = dim_A - 1
+    iterator = 0
+    graph.remove_edge((0, 0), (1, 0))
+    for node in graph.nodes:  # accessing nodes on the boundaries of the network
+        if node[0] == 0 and node[1] != last_index:
+            graph.remove_edge((node), (0, node[1]+1))
+
+        elif node[0] == last_index and node[1] != last_index:
+            graph.remove_edge((node), (last_index, node[1]+1))
+
+        elif node[1] == 0 and node[0] != last_index:
+            graph.remove_edge((node), (node[0]+1, 0))
+
+        elif node[1] == last_index and node[0] != last_index:
+            graph.remove_edge((node), (node[0]+1, last_index))
+        iterator += 1
+
+    for node in dict(graph.nodes).copy():
+        neighbors = set(nx.neighbors(graph, node))
+        if len(neighbors) == 0:
+            graph.remove_node(node)
+    """
+
     inc_mtx = nx.incidence_matrix(graph)
     inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
     inc_mtx_dense_int = inc_mtx_dense.astype(int)
@@ -83,9 +109,10 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     #print(np.allclose(incidence_T_inv @ incidence_T @ incidence_T_inv, incidence_T_inv))
     #print(np.allclose(incidence_T @ incidence_T_inv @ incidence_T, incidence_T))
 
-    eps = 0.9
-    conductivity_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
-    length_list = np.ones(edges_dim) # + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
+    eps = 0.8
+    radii_list = np.ones(edges_dim) + np.random.default_rng().uniform(-eps, eps, edges_dim)  # ones + stochastic noise
+    conductivity_list = 0.2*np.float_power(radii_list, 4)
+    length_list = 0.8*np.ones(edges_dim) # + np.random.default_rng().uniform(-eps, eps, edges_dim)        # vector from edges space
 
 
     # source in one node on the left and sink in one node on the right -- resulting in a corridor between them
@@ -132,6 +159,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
         source_list = np.zeros(dimension)                            # vector from nodes space
         source_list[int((dimension-1)/2)] = source_value             # source in the center
         number_of_boundary_nodes = 4*np.sqrt(dimension)-4
+        #number_of_boundary_nodes = 4*np.sqrt(dimension)-4-4          # without edges on outermost ring
         last_index = int(np.sqrt(dimension)-1)
         iterator = 0
         for node in graph.nodes:        # accessing nodes on the boundaries of the network
@@ -177,6 +205,7 @@ def generate_physical_values(graph, source_value, incidence_matrix, corridor_mod
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
+    flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
 
     return incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
 
@@ -294,8 +323,6 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     # np.exp(r*t*delta/2)
     t = 0
 
-
-
     # two control parameters
     rho = b/(r*gamma*delta)   # the ratio between the time scales for adaptation and growth
     print("RHO: ", rho)
@@ -303,7 +330,6 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     source_hat = source_value
     kappa = (c/a)*np.float_power((flow_hat/source_hat), 2*gamma)  # a/c is the ratio between background growth rate and adaptation strength and the hatted quantities are typical scales for flow and source strength.
     print("KAPPA: ", kappa)
-
 
     # implementing scaling factors
     if is_scaled:
@@ -319,13 +345,17 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     number_of_removed_edges = 0
     number_of_removed_nodes = 0
+    print("Sum of conductivity: ", np.sum(conductivity_list))
 
-    lagrange_multiplier = 0.000001
+    lagrange_multiplier = 0.01
     flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma +1)*np.float_power(conductivity_list, 1/(2*gamma))
     for n in range(1, N+1):
         t += dt
-        if n!= 0 and n!= N and n == N/4 or n == N/2 or n == (3*N)/4:
+
+        if n!= 0 and n!= N and n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4:
             draw_graph(graph, f"graph_at_{n/N}", pos, conductivity_list, m)
+            energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
+            print("Sum of conductivity: ", np.sum(conductivity_list))
 
         # pruning implementation
         if with_pruning:
@@ -349,7 +379,6 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
                     #pos = dict((m, m) for m in graph.nodes())
                     number_of_removed_nodes += 1
 
-
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
         dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
         #dK = dt * (np.float_power(a * (np.abs(flow_from_lagrange_optimisation) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
@@ -369,7 +398,6 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
 
         #dEdF_lam_dgdF = np.sum(flow_list) / np.sum(conductivity_list)    # checking first eq from lagrange optimisation
         #print(dEdF_lam_dgdF)
-
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', round(t*b, 3), "1/(b')  =  ", round(t, 3), "seconds")
@@ -397,7 +425,10 @@ def draw_graph(graph, name, pos, conductivity_list, n):
 
     plt.axis('off')
     plt.axis('scaled')
-    plt.savefig("%s.png" % name)
+    plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
+                        hspace=0, wspace=0)
+    plt.margins(0, 0)
+    plt.savefig("%s.png" % name, bbox_inches=0)
     plt.clf()
     #plt.show()
     # nodes colour - heatmap of pressure
