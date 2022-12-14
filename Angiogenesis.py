@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import time
 import scipy
-import matplotlib
+import matplotlib as mpl
 import seaborn as sns
 from bokeh.io import export_png, export_svgs
 from bokeh.models import ColumnDataSource, DataTable, TableColumn
@@ -308,7 +308,6 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
 
     # checking cost constraint = sum over edges L * K^(1/gamma - 1)
     constraint = np.sum(length_list * np.float_power(conductivity_list, (1/gamma - 1)))
-    # what does it mean when it's not constant?
 
     if show_result:
         print("Energy: ", energy)
@@ -352,7 +351,7 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
     for n in range(1, N+1):
         t += dt
 
-        if n!= 0 and n!= N and n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4:
+        if n != 0 and n != N and n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4:
             draw_graph(graph, f"graph_at_{n/N}", pos, conductivity_list, m)
             energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
             print("Sum of conductivity: ", np.sum(conductivity_list))
@@ -419,15 +418,20 @@ def draw_graph(graph, name, pos, conductivity_list, n):
         nx.draw_networkx_nodes(graph, pos=pos, node_size=400/(n))
         nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
     else:
-        #nx.draw_networkx(graph, pos=pos)
-        nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)
+        #nx.draw_networkx_nodes(graph, nodelist=(n-1, n-1), pos=pos, node_size=100 / (2 * n), node_color='black')
+        nc = nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*1.5, edge_color=conductivity_list ,edge_cmap=plt.cm.magma_r, edge_vmin=0, edge_vmax=100)
 
+    #ax = plt.subplot()
+    #im = ax.imshow(np.arange(100).reshape((10, 10)))
     plt.axis('off')
     plt.axis('scaled')
     plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
                         hspace=0, wspace=0)
     plt.margins(0, 0)
+    plt.tight_layout(pad=0)
+    norm = mpl.colors.Normalize(vmin=0, vmax=70)
+    cax = plt.axes([0.85, 0.1, 0.075, 0.8])
+    plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=plt.cm.magma_r), cax=cax)
     plt.savefig("%s.png" % name, bbox_inches=0)
     plt.clf()
     #plt.show()

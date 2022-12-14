@@ -7,7 +7,7 @@ start_time = time.time()
 
 hexagonal = 0
 triangular = 0
-m = 21
+m = 23
 number_of_nodes = m*m
 #adjacency_matrix = an.generate_random_adjacent_matrix(number_of_nodes)
 # random graph
@@ -45,7 +45,7 @@ print(edges_data)
 print(nodes_data)
 
 # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-parameters_set = {'a': 2.9, 'b': 3.3, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'flow_hat': 0.3, 'c': 0.0001, 'r': 1.7, 'dt': 0.1, 'N': 200}
+parameters_set = {'a': 2.1, 'b': 3.1, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'flow_hat': 0.3, 'c': 0.0001, 'r': 2.7, 'dt': 0.05, 'N': 32}
 
 graph, conductivity_list = an.run_simulation(source_value, m, pos, nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True, with_pruning=False)
 print(edges_data)
