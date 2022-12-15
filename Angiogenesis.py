@@ -418,9 +418,10 @@ def draw_graph(graph, name, pos, conductivity_list, n):
         nx.draw_networkx(graph, pos=pos, node_size=400/(n))
         nx.draw_networkx_nodes(graph, pos=pos, node_size=400/(n))
         nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
-    else:
-        #nx.draw_networkx(graph, pos=pos)
+    elif 99 < len(conductivity_list) < 1000:
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)
+    elif 999 < len(conductivity_list):
         nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)
 
     plt.axis('off')
