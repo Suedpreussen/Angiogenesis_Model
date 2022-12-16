@@ -279,7 +279,7 @@ def draw_histogram(edges_data, file_name):
     # draw histograms
     ax[0].hist(edges_data['conductivity'], bins=20)
     ax[1].hist(edges_data['flow'], bins=20)
-    plt.savefig(f'histogram_{file_name}')
+    plt.savefig(f'histogram_{file_name}.png')
     plt.clf()
 
 
@@ -322,6 +322,8 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         if n != 0 and n != N and n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4:
             print(f"______n = {n}________")
             draw_graph(graph, f"graph_at_{n/N}", pos, conductivity_list, m)
+            update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data,edges_data)
+            draw_histogram(edges_data, f"{n/N}")
             print("Q_av: ", np.average(np.abs(flow_list)))
             energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
             print("Sum of conductivity: ", np.sum(conductivity_list))

@@ -7,7 +7,7 @@ start_time = time.time()
 
 hexagonal = 0
 triangular = 0
-m = 13
+m = 23
 number_of_nodes = m*m
 incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(m, m, hexagonal=hexagonal, triangular=triangular)
 
@@ -42,7 +42,7 @@ an.draw_graph(graph, "initial_graph", pos, conductivity_list, m)
 print("Q_av:", np.average(np.abs(flow_list)))
 
 # dK/dt = a*(Q/Q_hat)^(2*gamma) - b*K + c
-parameters_set = {'a': 3.1, 'b': 4.5, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'flow_hat': np.average(np.abs(flow_list)), 'c': 0.001, 'r': 2.2, 'dt': 0.01, 'N': 160}
+parameters_set = {'a': 3.1, 'b': 4.5, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'flow_hat': np.average(np.abs(flow_list)), 'c': 0.001, 'r': 2.2, 'dt': 0.005, 'N': 800}
 graph, conductivity_list = an.run_simulation(source_value, m, pos, nodes_data, edges_data, **arguments, **parameters_set, is_scaled=True)
 
 #print(edges_data)

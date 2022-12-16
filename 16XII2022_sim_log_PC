@@ -1,0 +1,45 @@
+number of nodes fulfilling K's law: 529 out of 529
+number of nodes fulfilling Murray's law: 0 out of 529
+SUCCESS! Kirchhoff's law fulfilled!
+Q_av: 0.41908597704518924
+RHO:  1.5264586160108549
+KAPPA:  1.641139772944173e-06
+time unit:  0.13426423200859292
+Energy:  1359.8657943675917
+Constraint:  541.0678786417
+Sum of conductivity:  731.3744708234346
+______n = 50________
+Q_av:  0.3822548534925249
+Energy:  161.16234369573272
+Constraint:  505.47741532631665
+Sum of conductivity:  816.4649530567785
+______n = 100________
+Q_av:  0.37735250776767254
+Energy:  151.69417307102998
+Constraint:  453.29692266699885
+Sum of conductivity:  848.8406644380914
+______n = 150________
+Q_av:  0.3756737355731949
+Energy:  146.90156189893904
+Constraint:  423.4069907450343
+Sum of conductivity:  874.7501834903685
+______n = 200________
+Q_av:  0.37470569212270805
+Energy:  142.21259825258988
+Constraint:  403.59944256493395
+Sum of conductivity:  895.2054564732402
+______n = 400________
+Q_av:  0.3748469661328924
+Energy:  135.33465079440964
+Constraint:  372.62989144643416
+Sum of conductivity:  935.3951449635442
+______n = 600________
+Q_av:  0.3747100564867257
+Energy:  135.07650992219652
+Constraint:  370.17918672048006
+Sum of conductivity:  936.7111291656533
+simulation time:  29.792 1/(b')  =   4.0 seconds
+number of nodes fulfilling K's law: 529 out of 529
+number of nodes fulfilling Murray's law: 0 out of 529
+SUCCESS! Kirchhoff's law fulfilled!
+time elapsed: 430.27s
