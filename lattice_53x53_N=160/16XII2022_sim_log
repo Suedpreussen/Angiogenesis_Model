@@ -1,0 +1,51 @@
+number of nodes fulfilling K's law: 2809 out of 2809
+number of nodes fulfilling Murray's law: 0 out of 2809
+SUCCESS! Kirchhoff's law fulfilled!
+RHO:  1.5264586160108549
+KAPPA:  5.494418744551533e-07
+time unit:  0.13426423200859292
+______n = 0________
+Q_av:  0.4359793608229623
+Energy:  6195.098752587011
+Constraint:  2974.593057474878
+Sum of conductivity:  3989.7456446658243
+______n = 10________
+Q_av:  0.3978082801249084
+Energy:  1130.7130600108992
+Constraint:  2980.2057347949917
+Sum of conductivity:  4275.445017144313
+______n = 20________
+Q_av:  0.3894276847278602
+Energy:  956.436321814746
+Constraint:  2807.320343784095
+Sum of conductivity:  4364.611010203868
+______n = 30________
+Q_av:  0.38553363128748835
+Energy:  901.6036619993877
+Constraint:  2645.744139240004
+Sum of conductivity:  4447.424180111352
+______n = 40________
+Q_av:  0.3833379283843237
+Energy:  870.0449577343787
+Constraint:  2509.6018066764445
+Sum of conductivity:  4554.449547807469
+______n = 80________
+Q_av:  0.3802754781946704
+Energy:  771.5234298665321
+Constraint:  2126.485108201677
+Sum of conductivity:  5104.387373336502
+______n = 120________
+Q_av:  0.37950973419834866
+Energy:  710.5933773188851
+Constraint:  1899.01514916609
+Sum of conductivity:  5530.465289471558
+______n = 160________
+Q_av:  0.3798011088564827
+Energy:  682.1402267957449
+Constraint:  1780.1482200468904
+Sum of conductivity:  5754.623849191629
+simulation time:  11.917 1/(b')  =   1.6 seconds
+number of nodes fulfilling K's law: 2809 out of 2809
+number of nodes fulfilling Murray's law: 0 out of 2809
+SUCCESS! Kirchhoff's law fulfilled!
+time elapsed: 6182.68s

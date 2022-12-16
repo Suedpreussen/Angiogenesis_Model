@@ -14,15 +14,15 @@ create grid --> assign physical attributes --> run simulation and create visuali
 TABLE OF CONTENT
 --------------------
 generate_grid_graph
-localise_sourcce
+localise_source
 generate_physical_values
 update_df
 set_graph_attributes
 update_graph_data
-checking_Murrays_law
-checking_Kirchhoffs_law
-run_simulation
+checking_Kirchhoffs_and_Murrays_law
 draw_graph
+draw_histogram
+run_simulation
 
 unused code sent to Utils file
 """
@@ -57,8 +57,10 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
     edges_data = pd.DataFrame(edges_list)
     return inc_mtx_dense_int, graph, nodes_data, edges_data
 
+
 def localise_source(graph, source_value, corridor_model=False, two_capacitor_plates_model=False,
-                             one_capacitor_plates_model=False, square_concentric_model=False, veins_square_concentric_model=False, triangular=False):
+                             one_capacitor_plates_model=False, square_concentric_model=False,
+                                veins_square_concentric_model=False, triangular=False):
     nodes_dim = graph.number_of_nodes()
 
     # source in one node on the left and sink in one node on the right -- resulting in a corridor between them
@@ -129,6 +131,7 @@ def localise_source(graph, source_value, corridor_model=False, two_capacitor_pla
 
     return source_list
 
+
 def generate_physical_values(source_list, incidence_matrix):
     # nodes-space vectors: source, pressure
     # edges-space vectors: conductivity, length, flow, pressure difference
@@ -164,11 +167,11 @@ def generate_physical_values(source_list, incidence_matrix):
 def update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time= False):
     # creating data frames
     if first_time:
-        if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
+        if np.shape(nodes_data)[1] == 1:                         # nodes are indexing by one int
             nodes_data.columns = ['nodes']
             nodes_data['pressure'] = pressure_list
             nodes_data['source'] = source_list
-        elif np.shape(nodes_data)[1] == 2:                                  # nodes are indexing by two ints
+        elif np.shape(nodes_data)[1] == 2:                       # nodes are indexing by two ints
             nodes_data.columns = ['no-', '-des']
             nodes_data['pressure'] = pressure_list
             nodes_data['source'] = source_list
@@ -176,7 +179,6 @@ def update_df(source_list, pressure_list, conductivity_list, flow_list, pressure
         edges_data['conductivity'] = conductivity_list
         edges_data['flow'] = np.abs(flow_list)
         edges_data['press_diff'] = pressure_diff_list
-
     # updating data frames
     else:
         edges_data['conductivity'] = conductivity_list
@@ -195,7 +197,6 @@ def set_graph_attributes(graph, pressure_list, conductivity_list, flow_list, pre
         node_attrs[key] = vals
         iterator += 1
     nx.set_node_attributes(graph, node_attrs)
-
     # now for edges
     edge_attrs = dict(graph.edges)
     iterator = 0
@@ -233,7 +234,6 @@ def checking_Kirchhoffs_and_Murrays_law(graph, source_list):
             if np.sum(edge[0]) < np.sum(edge[1]):
                 flow_sum += graph[edge[0]][edge[1]]['flow']
                 radii_in_sum += np.float_power(graph[edge[0]][edge[1]]['conductivity'], -alpha / 4)
-
             else:
                 flow_sum -= graph[edge[0]][edge[1]]['flow']
                 radii_out_sum -= np.float_power(graph[edge[0]][edge[1]]['conductivity'], -alpha / 4)
@@ -271,24 +271,81 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
         print("Energy: ", energy)
         print("Constraint: ", constraint)
 
-def draw_histogram(edges_data, file_name):
-    fig, ax = plt.subplots(1, 2, figsize=(10, 6))
+
+def draw_histogram(directory_name, edges_data, file_name):
+    fig, ax = plt.subplots(1, 2)   #, figsize=(6.4, 4.8)
     # titles
     ax[0].set_title('Conductivity')
     ax[1].set_title('Flow')
     # draw histograms
-    ax[0].hist(edges_data['conductivity'], bins=20)
-    ax[1].hist(edges_data['flow'], bins=20)
-    plt.savefig(f'histogram_{file_name}')
+    ax[0].hist(edges_data['conductivity'], bins=40)
+    ax[1].hist(edges_data['flow'], bins=40)
+    plt.savefig(f'{directory_name}/{file_name}.png', dpi=300)
     plt.clf()
 
 
-def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
-                     pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
-                     a, b, gamma, delta, nu, flow_hat, c, r, dt, N, is_scaled=False, with_pruning=False):
-    t = 0
+def draw_global_histogram(directory_name, list_of_dfs):
+    fig, ax = plt.subplots(1, 2)   #, figsize=(6.4, 4.8)
+    # titles
+    ax[0].set_title('Conductivity')
+    ax[1].set_title('Flow')
+    for df in list_of_dfs:
+        # draw histograms
+        ax[0].hist(df['conductivity'], bins=40)
+        ax[1].hist(df['flow'], bins=40)
+    plt.savefig(f"{directory_name}/global_histogram.png")
+    plt.clf()
 
-    draw_histogram(edges_data, "initial")
+
+def draw_graph(directory_name, graph, name, conductivity_list, number_of_rowscols, triangular=False, hexagonal=False):
+    max = 26
+    cmap = plt.cm.magma_r
+    # setting the layout for the graph visualisation
+    if hexagonal:
+        pos = nx.get_node_attributes(graph, 'pos')  # hexagonal rigid layout
+    elif triangular:
+        pos = nx.get_node_attributes(graph, 'pos')  # triangular rigid layout
+    else:
+        pos = dict((number_of_rowscols, number_of_rowscols) for number_of_rowscols in graph.nodes())  # square rigid layout
+
+    # plot differently for different sizes of the network
+    if len(conductivity_list) < 100:
+        labels = nx.get_edge_attributes(graph, 'flow')
+        for key, val in labels.items():
+            new_val = round(val, 2)
+            labels[key] = new_val
+        nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels, rotate=False, font_color='red')
+        nx.draw_networkx(graph, pos=pos, node_size=400 / (number_of_rowscols))
+        nx.draw_networkx_nodes(graph, pos=pos, node_size=400 / (number_of_rowscols))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 2)
+    elif 99 < len(conductivity_list) < 400:
+        nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * number_of_rowscols))
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 2,
+                               edge_color=conductivity_list, edge_cmap=cmap, edge_vmin=0, edge_vmax=max)
+    elif 399 < len(conductivity_list):
+        # nx.draw_networkx_nodes(graph, nodelist=(n-1, n-1), pos=pos, node_size=100 / (2 * n), node_color='black')
+        nc = nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 1.5,
+                                    edge_color=conductivity_list, edge_cmap=cmap, edge_vmin=0, edge_vmax=max)
+    plt.axis('off')
+    plt.axis('scaled')
+    plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
+    plt.margins(0, 0)
+    plt.tight_layout(pad=0)
+    norm = mpl.colors.Normalize(vmin=0, vmax=max)
+    cax = plt.axes([0.85, 0.1, 0.075, 0.8])
+    plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax)
+    plt.savefig(f"{directory_name}/{name}.png", bbox_inches=0, dpi=300)
+    plt.clf()
+    # plt.show()
+
+
+def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data, edges_data, incidence_inv,
+                   incidence_T, incidence_matrix, graph, source_list,pressure_list, length_list,
+                   conductivity_list, flow_list, pressure_diff_list,a, b, gamma, delta, nu,
+                   flow_hat, c, r, dt, N, is_scaled=False, with_pruning=False):
+    t = 0
+    checking_Kirchhoffs_and_Murrays_law(graph, source_list)
+
     # two control parameters
     rho = b/(r*gamma*delta)   # the ratio between the time scales for adaptation and growth
     print("RHO: ", rho)
@@ -308,23 +365,26 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         c = c * np.exp(-r*t*gamma*delta)
         print("time unit: ", 1/b)
 
-    energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
+    lagrange_multiplier = 0.01
+    flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma+1)*np.float_power(conductivity_list, 1/(2*gamma))
 
+    # snapshot before the sim
+    # draw graphs
+    update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
+    draw_graph(directory_name,graph, f"graph_at_0_{N}", conductivity_list, number_of_rowscols)
+    draw_histogram(directory_name, edges_data, f"histogram_0_{N}")
+    # print log
+    print(f"______n = 0________")
+    print("Q_av: ", np.average(np.abs(flow_list)))
+    energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print("Sum of conductivity: ", np.sum(conductivity_list))
 
-    lagrange_multiplier = 0.01
-    flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma +1)*np.float_power(conductivity_list, 1/(2*gamma))
+    list_of_dfs = []                     # container to store dfs at snapshots
+    list_of_dfs.append(edges_data)
 
     # MAIN LOOP
     for n in range(1, N+1):
         t += dt
-
-        if n != 0 and n != N and n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4:
-            print(f"______n = {n}________")
-            draw_graph(graph, f"graph_at_{n/N}", pos, conductivity_list, m)
-            print("Q_av: ", np.average(np.abs(flow_list)))
-            energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
-            print("Sum of conductivity: ", np.sum(conductivity_list))
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
         dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
@@ -343,44 +403,23 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         # updating data in graph dics
         set_graph_attributes(graph, pressure_list, conductivity_list, flow_list, pressure_diff_list)
 
+        # sim snapshots
+        if n == N or n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4 or n == N/32 or n == (2*N)/32 or n == (3*N)/N:
+            # draw graphs
+            update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
+            draw_graph(directory_name, graph, f"graph_at_{n}_{N}", conductivity_list, number_of_rowscols)
+            list_of_dfs.append(edges_data)
+            draw_histogram(directory_name, edges_data, f"histogram_{n}_{N}")
+            # print log
+            print(f"________n = {n}________")
+            print("Q_av: ", np.average(np.abs(flow_list)))
+            energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
+            print("Sum of conductivity: ", np.sum(conductivity_list))
+
         #dEdF_lam_dgdF = np.sum(flow_list) / np.sum(conductivity_list)    # checking first eq from lagrange optimisation
         #print(dEdF_lam_dgdF)
 
     print('simulation time: ', round(t*b, 3), "1/(b')  =  ", round(t, 3), "seconds")
     update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
-    draw_histogram(edges_data, "final")
-
-    return graph, conductivity_list
-
-
-def draw_graph(graph, name, pos, conductivity_list, n):
-    max = 16
-    cmap = plt.cm.magma_r
-    if len(conductivity_list) < 100:
-        labels = nx.get_edge_attributes(graph, 'flow')
-        for key, val in labels.items():
-            new_val = round(val, 2)
-            labels[key] = new_val
-        nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels, rotate=False, font_color='red')
-        nx.draw_networkx(graph, pos=pos, node_size=400/(n))
-        nx.draw_networkx_nodes(graph, pos=pos, node_size=400/(n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)
-    elif 99 < len(conductivity_list) < 400:
-        nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 2)
-    elif 399 < len(conductivity_list):
-        #nx.draw_networkx_nodes(graph, nodelist=(n-1, n-1), pos=pos, node_size=100 / (2 * n), node_color='black')
-        nc = nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*1.5, edge_color=conductivity_list ,edge_cmap=cmap, edge_vmin=0, edge_vmax=max)
-
-    plt.axis('off')
-    plt.axis('scaled')
-    plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
-                        hspace=0, wspace=0)
-    plt.margins(0, 0)
-    plt.tight_layout(pad=0)
-    norm = mpl.colors.Normalize(vmin=0, vmax=max)
-    cax = plt.axes([0.85, 0.1, 0.075, 0.8])
-    plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax)
-    plt.savefig("%s.png" % name, bbox_inches=0)  # dpi=300 for high resolution!
-    plt.clf()
-    #plt.show()
+    checking_Kirchhoffs_and_Murrays_law(graph, source_list)
+    draw_global_histogram(directory_name, list_of_dfs)
