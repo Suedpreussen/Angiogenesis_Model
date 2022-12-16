@@ -17,7 +17,7 @@ generate_grid_graph
 localise_sourcce
 generate_physical_values
 update_df
-set attributes
+set_graph_attributes
 update_graph_data
 checking_Murrays_law
 checking_Kirchhoffs_law
@@ -161,7 +161,7 @@ def generate_physical_values(source_list, incidence_matrix):
     return incidence_T_inv, x, x_dagger, incidence_inv, incidence_T, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list
 
 
-def update_df(source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time= False):
+def update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time= False):
     # creating data frames
     if first_time:
         if np.shape(nodes_data)[1] == 1:                                    # nodes are indexing by one int
@@ -173,21 +173,20 @@ def update_df(source_list, pressure_list, length_list, conductivity_list, flow_l
             nodes_data['pressure'] = pressure_list
             nodes_data['source'] = source_list
         edges_data.columns = ['ed-', '-ges']
-        edges_data['length'] = length_list
-        edges_data['conduct.'] = conductivity_list
-        edges_data['flow'] = flow_list
+        edges_data['conductivity'] = conductivity_list
+        edges_data['flow'] = np.abs(flow_list)
         edges_data['press_diff'] = pressure_diff_list
 
     # updating data frames
     else:
-        edges_data['conduct.'] = conductivity_list
-        edges_data['flow'] = flow_list
+        edges_data['conductivity'] = conductivity_list
+        edges_data['flow'] = np.abs(flow_list)
         edges_data['press_diff'] = pressure_diff_list
         nodes_data['pressure'] = pressure_list
         nodes_data['source'] = source_list
 
 
-def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list):
+def set_graph_attributes(graph, pressure_list, conductivity_list, flow_list, pressure_diff_list):
     # node_attrs = {tuple : dic, tuple: dic, ...} -- dic of (tuples as keys) and (dics as values)
     node_attrs = dict(graph.nodes)
     iterator = 0
@@ -201,41 +200,62 @@ def set_attributes(graph, pressure_list, length_list, conductivity_list, flow_li
     edge_attrs = dict(graph.edges)
     iterator = 0
     for key in edge_attrs:
-        vals = {"length": length_list[iterator], "conductivity": conductivity_list[iterator],
+        vals = {"conductivity": conductivity_list[iterator],
                 "flow": flow_list[iterator], "pressure_diff": pressure_diff_list[iterator]}
         edge_attrs[key] = vals
         iterator += 1
     nx.set_edge_attributes(graph, edge_attrs)
 
 
-def checking_Murrays_law():
-    # Q = const * r^3
-    # r^3 = sum over cubes of radii of daughter branches
-    # first of all, network needs to be hierarchical
+def checking_Murrays_law(graph):
+    # Q = const * r^alpha
+    # K = const' * r^4  =>  r = const" * K^1/4
+    # Q = const''' * K^alpha/4  =>  Q * K^-alpha/4 = const'''
+    alpha = 7/3
+    constant_list = []
+    for edge in graph.edges():
+        constant = np.abs(graph[edge[0]][edge[1]]['flow']) * np.float_power(graph[edge[0]][edge[1]]['conductivity'], -alpha/4)
+        constant_list.append(constant)
+    print(f"power index={alpha}:  ", constant_list)
     pass
 
 
-def checking_Kirchhoffs_law(graph, source_list):
+def checking_Kirchhoffs_and_Murrays_law(graph, source_list):
     index = 0
-    successful_nodes = 0
+    successful_Kirchhoffs_nodes = 0
+    successful_Murrays_nodes = 0
+    alpha = 7/3
     for node in graph.nodes(data=False):
-        sum = 0
+        flow_sum = 0
+        radii_in_sum = 0
+        radii_out_sum = 0
         for edge in graph.edges(node):              # implementing direction of flow to the undirected graph
             if np.sum(edge[0]) < np.sum(edge[1]):
-                sum += graph[edge[0]][edge[1]]['flow']
-            else:
-                sum -= graph[edge[0]][edge[1]]['flow']
+                flow_sum += graph[edge[0]][edge[1]]['flow']
+                radii_in_sum += np.float_power(graph[edge[0]][edge[1]]['conductivity'], -alpha / 4)
 
-        if -1e-11 < sum - source_list[index] < 1e-11:       # checking for every node if the sum of inflows and ouflows yields zero
-            successful_nodes += 1
+            else:
+                flow_sum -= graph[edge[0]][edge[1]]['flow']
+                radii_out_sum -= np.float_power(graph[edge[0]][edge[1]]['conductivity'], -alpha / 4)
+
+        if -1e-11 < flow_sum - source_list[index] < 1e-11:       # checking for every node if the sum of inflows and ouflows yields zero
+            successful_Kirchhoffs_nodes += 1
         else:
             pass
-            print(sum, '|', source_list[index], '|', print(node))
-            #print("Kirchhoff's law at node {} NOT fulfilled!".format(node), sum + source_list[index])
+            print(flow_sum, '|', source_list[index], '|', print(node))
+            #print("Kirchhoff's law at node {} NOT fulfilled!".format(node), flow_sum + source_list[index])
+
+        if -1e-11 < np.abs(radii_in_sum - radii_out_sum) < 1e-11:       # checking M's law
+            successful_Murrays_nodes += 1
+        else:
+            pass
+            #print(np.abs(radii_in_sum - radii_out_sum) , '||', print(node))
         index += 1
 
-    print("number of nodes fulfilling K's law:", successful_nodes, 'out of', graph.number_of_nodes())
-    if successful_nodes == graph.number_of_nodes():
+    print("number of nodes fulfilling K's law:", successful_Kirchhoffs_nodes, 'out of', graph.number_of_nodes())
+    print("number of nodes fulfilling Murray's law:", successful_Murrays_nodes, 'out of', graph.number_of_nodes())
+
+    if successful_Kirchhoffs_nodes == graph.number_of_nodes():
         print("SUCCESS! Kirchhoff's law fulfilled!")
 
 
@@ -251,15 +271,24 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
         print("Energy: ", energy)
         print("Constraint: ", constraint)
 
+def draw_histogram(edges_data, file_name):
+    fig, ax = plt.subplots(1, 2, figsize=(10, 6))
+    # titles
+    ax[0].set_title('Conductivity')
+    ax[1].set_title('Flow')
+    # draw histograms
+    ax[0].hist(edges_data['conductivity'], bins=20)
+    ax[1].hist(edges_data['flow'], bins=20)
+    plt.savefig(f'histogram_{file_name}')
+    plt.clf()
+
 
 def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, incidence_T_inv, incidence_inv, incidence_T, incidence_matrix, graph, source_list,
                      pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list,
                      a, b, gamma, delta, nu, flow_hat, c, r, dt, N, is_scaled=False, with_pruning=False):
-    # solving diff eq
-    # exp(r*t/2)^(delta)
-    # np.exp(r*t*delta/2)
     t = 0
 
+    draw_histogram(edges_data, "initial")
     # two control parameters
     rho = b/(r*gamma*delta)   # the ratio between the time scales for adaptation and growth
     print("RHO: ", rho)
@@ -280,41 +309,22 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         print("time unit: ", 1/b)
 
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
-    number_of_removed_edges = 0
-    number_of_removed_nodes = 0
+
     print("Sum of conductivity: ", np.sum(conductivity_list))
 
     lagrange_multiplier = 0.01
     flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier)*np.sqrt(1/gamma +1)*np.float_power(conductivity_list, 1/(2*gamma))
+
+    # MAIN LOOP
     for n in range(1, N+1):
         t += dt
 
         if n != 0 and n != N and n == N/16 or n == (2*N)/16 or n == (3*N)/16 or n == N/4 or n == N/2 or n == (3*N)/4:
+            print(f"______n = {n}________")
             draw_graph(graph, f"graph_at_{n/N}", pos, conductivity_list, m)
+            print("Q_av: ", np.average(np.abs(flow_list)))
             energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
             print("Sum of conductivity: ", np.sum(conductivity_list))
-
-        # pruning implementation
-        if with_pruning:
-            for edge in graph.edges:
-                con_val = graph.get_edge_data(*edge)["conductivity"]
-                #print(*edge, " | ", con_val)
-                if con_val < 1e-11:                 # removing an edge if its radius is ~= 0
-                    graph.remove_edge(*edge)
-                    print('edge', *edge, 'removed')
-                    number_of_removed_edges += 1
-
-            for node in dict(graph.nodes).copy():           # for reasons unknown I had to cast graph.nodes into dict
-                                                            # and use dictionary method copy() to get away with error
-                                                            # "RuntimeError: dictionary changed size during iteration"
-                                                            # but with edges it worked just fine
-                neighbors = set(nx.neighbors(graph, node))
-                #print(len(neighbors))
-                if len(neighbors) == 0:
-                    graph.remove_node(node)
-                    print('node', node, 'removed')
-                    #pos = dict((m, m) for m in graph.nodes())
-                    number_of_removed_nodes += 1
 
         # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
         dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
@@ -331,22 +341,20 @@ def run_simulation(source_value, m, pos, nodes_data, edges_data, x, x_dagger, in
         energy_functional(conductivity_list, length_list, flow_list, gamma)
 
         # updating data in graph dics
-        set_attributes(graph, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list)
+        set_graph_attributes(graph, pressure_list, conductivity_list, flow_list, pressure_diff_list)
 
         #dEdF_lam_dgdF = np.sum(flow_list) / np.sum(conductivity_list)    # checking first eq from lagrange optimisation
         #print(dEdF_lam_dgdF)
 
-    energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print('simulation time: ', round(t*b, 3), "1/(b')  =  ", round(t, 3), "seconds")
-    print("number of removed edges: ", number_of_removed_edges)
-    print("number of removed nodes: ", number_of_removed_nodes)
+    update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
+    draw_histogram(edges_data, "final")
 
-    update_df(source_list, pressure_list, length_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
     return graph, conductivity_list
 
 
 def draw_graph(graph, name, pos, conductivity_list, n):
-    max = 40
+    max = 16
     cmap = plt.cm.magma_r
     if len(conductivity_list) < 100:
         labels = nx.get_edge_attributes(graph, 'flow')
@@ -356,16 +364,14 @@ def draw_graph(graph, name, pos, conductivity_list, n):
         nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels, rotate=False, font_color='red')
         nx.draw_networkx(graph, pos=pos, node_size=400/(n))
         nx.draw_networkx_nodes(graph, pos=pos, node_size=400/(n))
-        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)  #, edge_color=flow_list   + np.ones(len(conductivity_list))  np.float_power(conductivity_list, 4)
-    elif 99 < len(conductivity_list) < 1000:
+        nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*2)
+    elif 99 < len(conductivity_list) < 400:
         nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * n))
         nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 2)
-    elif 999 < len(conductivity_list):
+    elif 399 < len(conductivity_list):
         #nx.draw_networkx_nodes(graph, nodelist=(n-1, n-1), pos=pos, node_size=100 / (2 * n), node_color='black')
         nc = nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1/4)*1.5, edge_color=conductivity_list ,edge_cmap=cmap, edge_vmin=0, edge_vmax=max)
 
-    #ax = plt.subplot()
-    #im = ax.imshow(np.arange(100).reshape((10, 10)))
     plt.axis('off')
     plt.axis('scaled')
     plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
@@ -375,15 +381,6 @@ def draw_graph(graph, name, pos, conductivity_list, n):
     norm = mpl.colors.Normalize(vmin=0, vmax=max)
     cax = plt.axes([0.85, 0.1, 0.075, 0.8])
     plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax)
-    plt.savefig("%s.png" % name, bbox_inches=0)
+    plt.savefig("%s.png" % name, bbox_inches=0)  # dpi=300 for high resolution!
     plt.clf()
     #plt.show()
-    # nodes colour - heatmap of pressure
-    # edges length - proportional to length
-    # edges colour - proportional to flow
-    # edges arrows - in alignment with the sign of flow
-    # edges thickness - proportional to (conductivity)^(-4)s
-    # node_color=range(24), node_size=800, cmap=plt.cm.Blues
-    """
-    
-    """
