@@ -167,11 +167,11 @@ def generate_physical_values(source_list, incidence_matrix):
 def update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data, first_time= False):
     # creating data frames
     if first_time:
-        if np.shape(nodes_data)[1] == 1:                         # nodes are indexing by one int
+        if np.shape(nodes_data)[1] == 1:                         # if nodes are indexing by one int
             nodes_data.columns = ['nodes']
             nodes_data['pressure'] = pressure_list
             nodes_data['source'] = source_list
-        elif np.shape(nodes_data)[1] == 2:                       # nodes are indexing by two ints
+        elif np.shape(nodes_data)[1] == 2:                       # if nodes are indexing by two ints
             nodes_data.columns = ['no-', '-des']
             nodes_data['pressure'] = pressure_list
             nodes_data['source'] = source_list
