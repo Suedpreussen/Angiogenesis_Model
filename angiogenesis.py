@@ -28,6 +28,55 @@ unused code sent to Utils file
 """
 
 
+class Model:
+    """Main class"""
+    def __int__(self, number_of_rows_or_columns: int, shape_of_boundaries="a_square", type_of_lattice="square"):
+        """Class constructor"""
+        if type_of_lattice == "square":
+            assert number_of_rows_or_columns % 2 != 0, "Square model needs to have an odd number of rows or columns to get a central node."
+
+        # save given model parameters
+        self.__number_of_rows_or_columns = number_of_rows_or_columns
+        self.__shape_of_boundaries = shape_of_boundaries
+        self.__type_of_lattice = type_of_lattice
+
+    def __generate_lattice(self):
+        """Setting up lattice"""
+        pass
+
+    def __localise_source(self):
+        """Compute source vector"""
+        pass
+
+    def __compute_physical_values(self):
+        pass
+
+    def __update_pandas_data(self):
+        pass
+
+    def __update_networkx_data(self):
+        pass
+
+    def __check_kirchhoffs(self):
+        pass
+
+    def __compute_energy_dissipation(self):
+        pass
+
+    def draw_histogram(self):
+        pass
+
+    def draw_graph(self):
+        pass
+
+    def create_experiment_log(self):
+        pass
+
+    def run_simulation(self):
+        pass
+
+
+
 def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangular=False):
     if hexagonal:
         graph = nx.hexagonal_lattice_graph(dim_A, dim_B, periodic=periodic)
