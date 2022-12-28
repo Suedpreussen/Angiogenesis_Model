@@ -30,7 +30,7 @@ unused code sent to Utils file
 
 class Model:
     """Main class"""
-    def __int__(self, number_of_rows_or_columns: int, shape_of_boundaries="a_square", type_of_lattice="square"):
+    def __int__(self, number_of_rows_or_columns: int, shape_of_boundaries="square", type_of_lattice="square"):
         """Class constructor"""
         if type_of_lattice == "square":
             assert number_of_rows_or_columns % 2 != 0, "Square model needs to have an odd number of rows or columns to get a central node."
@@ -57,7 +57,7 @@ class Model:
     def __update_networkx_data(self):
         pass
 
-    def __check_kirchhoffs(self):
+    def __check_kirchhoffs_law(self):
         pass
 
     def __compute_energy_dissipation(self):
@@ -69,10 +69,12 @@ class Model:
     def draw_graph(self):
         pass
 
+
+class Simulation(Model):
     def create_experiment_log(self):
         pass
 
-    def run_simulation(self):
+    def run_simulation(self, simulation_parameters):
         pass
 
 
@@ -98,7 +100,7 @@ def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangula
                 ones_count += 1
                 if ones_count == 2:
                     row[row_element_count] *= -1
-            row_element_count +=1
+            row_element_count += 1
 
     nodes_list = graph.nodes()
     edges_list = graph.edges()
@@ -428,8 +430,8 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
     energy_functional(conductivity_list, length_list, flow_list, gamma, show_result=True)
     print("Sum of conductivity: ", np.sum(conductivity_list))
 
-    list_of_dfs = []                     # container to store dfs at snapshots
-    list_of_dfs.append(edges_data)
+    #list_of_dfs = []                     # container to store dfs at snapshots
+    #list_of_dfs.append(edges_data)
 
     # MAIN LOOP
     for n in range(1, N+1):
@@ -457,7 +459,7 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
             # draw graphs
             update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
             draw_graph(directory_name, graph, f"graph_at_{n}_{N}", conductivity_list, number_of_rowscols)
-            list_of_dfs.append(edges_data)
+            #list_of_dfs.append(edges_data)
             draw_histogram(directory_name, edges_data, f"histogram_{n}_{N}")
             # print log
             print(f"________n = {n}________")
@@ -471,4 +473,4 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
     print('simulation time: ', round(t*b, 3), "1/(b')  =  ", round(t, 3), "seconds")
     update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
     checking_Kirchhoffs_and_Murrays_law(graph, source_list)
-    draw_global_histogram(directory_name, list_of_dfs)
+    #draw_global_histogram(directory_name, list_of_dfs)

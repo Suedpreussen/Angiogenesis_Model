@@ -1,12 +1,22 @@
 import angiogenesis as an
 import time
 import numpy as np
+import cProfile as profile
+
+# In outer section of code
+pr = profile.Profile()
+pr.enable()
+
+
 
 start_time = time.time()
 
+
+
+
 hexagonal = 0
 triangular = 0
-number_of_rowscols = 13
+number_of_rowscols = 39
 number_of_nodes = number_of_rowscols*number_of_rowscols
 incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(number_of_rowscols, number_of_rowscols, hexagonal=hexagonal, triangular=triangular)
 
@@ -29,10 +39,16 @@ an.update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_
 #print(nodes_data)
 
 # dK/dt = a*(Q/Q_hat)^(2*gamma) - b*K + c
-parameters_set = {'a': 3.1, 'b': 4.5, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'flow_hat': np.average(np.abs(flow_list)), 'c': 0.001, 'r': 2.2, 'dt': 0.01, 'N': 1}
+parameters_set = {'a': 3.1, 'b': 4.5, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'flow_hat': np.average(np.abs(flow_list)), 'c': 0.001, 'r': 2.2, 'dt': 0.01, 'N': 200}
 an.run_simulation("lattice_53x53_N=160", **arguments, **parameters_set, is_scaled=True)
 
 #print(edges_data)
 #print(nodes_data)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
+
+pr.disable()
+pr.dump_stats('profile3.pstat')
+
+print("time elapsed after profiling: {:.2f}s".format(time.time() - start_time))
+
