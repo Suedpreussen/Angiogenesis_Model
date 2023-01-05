@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scipy
 import matplotlib as mpl
+import jaxlib
+import jax.numpy as jnp
 
 """
 General idea:
@@ -30,7 +32,7 @@ unused code sent to Utils file
 
 class Model:
     """Main class"""
-    def __int__(self, number_of_rows_or_columns: int, shape_of_boundaries="square", type_of_lattice="square"):
+    def __int__(self, number_of_rows_or_columns, shape_of_boundaries="square", type_of_lattice="square"):
         """Class constructor"""
         if type_of_lattice == "square":
             assert number_of_rows_or_columns % 2 != 0, "Square model needs to have an odd number of rows or columns to get a central node."
@@ -40,9 +42,36 @@ class Model:
         self.__shape_of_boundaries = shape_of_boundaries
         self.__type_of_lattice = type_of_lattice
 
-    def __generate_lattice(self):
+
         """Setting up lattice"""
-        pass
+
+        if type_of_lattice == "square":
+            graph = nx.grid_graph(dim=(number_of_rows_or_columns, number_of_rows_or_columns))
+        elif type_of_lattice == "triangular":
+            graph = nx.triangular_lattice_graph(number_of_rows_or_columns, number_of_rows_or_columns, periodic=True)
+
+        # compute incidence matrix of the graph
+        inc_mtx = nx.incidence_matrix(graph)
+        inc_mtx_dense = scipy.sparse.csr_matrix.todense(inc_mtx)
+        inc_mtx_dense_int = inc_mtx_dense.astype(int)
+
+        # change incidence matrix to a directed one
+        for row in inc_mtx_dense_int.T:
+            ones_count = 0
+            row_element_count = 0
+            for element in row:
+                if element == 1:
+                    ones_count += 1
+                    if ones_count == 2:
+                        row[row_element_count] *= -1
+                row_element_count += 1
+
+        # save relevant quantities as attributes
+        self.graph = graph
+        self.nodes_list = graph.nodes()
+        self.edges_list = graph.edges()
+        self.incidence_matrix = inc_mtx_dense_int
+
 
     def __localise_source(self):
         """Compute source vector"""
@@ -50,10 +79,33 @@ class Model:
 
     def __compute_physical_values(self):
         pass
-
+    """
     def __update_pandas_data(self):
-        pass
-
+        'Create and update pandas dataframes'
+        # creating data frames
+        nodes_data = pd.DataFrame(nodes_list)
+        edges_data = pd.DataFrame(edges_list)
+        if first_time:
+            if np.shape(nodes_data)[1] == 1:  # if nodes are indexing by one int
+                nodes_data.columns = ['nodes']
+                nodes_data['pressure'] = pressure_list
+                nodes_data['source'] = source_list
+            elif np.shape(nodes_data)[1] == 2:  # if nodes are indexing by two ints
+                nodes_data.columns = ['no-', '-des']
+                nodes_data['pressure'] = pressure_list
+                nodes_data['source'] = source_list
+            edges_data.columns = ['ed-', '-ges']
+            edges_data['conductivity'] = conductivity_list
+            edges_data['flow'] = np.abs(flow_list)
+            edges_data['press_diff'] = pressure_diff_list
+        # updating data frames
+        else:
+            edges_data['conductivity'] = conductivity_list
+            edges_data['flow'] = np.abs(flow_list)
+            edges_data['press_diff'] = pressure_diff_list
+            nodes_data['pressure'] = pressure_list
+            nodes_data['source'] = source_list
+    """
     def __update_networkx_data(self):
         pass
 
@@ -190,8 +242,8 @@ def generate_physical_values(source_list, incidence_matrix):
     edges_dim = np.shape(incidence_matrix)[1]
 
     incidence_T = incidence_matrix.transpose()
-    incidence_T_inv = np.linalg.pinv(incidence_T)
-    incidence_inv = np.linalg.pinv(incidence_matrix)
+    incidence_T_inv = jnp.linalg.pinv(incidence_T)
+    incidence_inv = jnp.linalg.pinv(incidence_matrix)
 
     epsilon = 0.8
     radii_list = np.ones(edges_dim) + np.random.default_rng().uniform(-epsilon, epsilon, edges_dim)  # ones + stochastic noise
@@ -207,8 +259,10 @@ def generate_physical_values(source_list, incidence_matrix):
 
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
-    x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
-
+    print(x)
+    x_dagger = jnp.linalg.pinv(x)  # Penrose pseudo-inverse
+    print('******************************')
+    print(x_dagger)
     # Q = K/L * delta * (delta^T * K/L * delta)^dagger * S
     flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
 
@@ -443,7 +497,7 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
         conductivity_list += dK
 
         x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
-        x_dagger = np.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
+        x_dagger = jnp.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
 
         # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
         flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
