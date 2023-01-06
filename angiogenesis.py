@@ -32,7 +32,7 @@ unused code sent to Utils file
 
 class Model:
     """Main class"""
-    def __int__(self, number_of_rows_or_columns, shape_of_boundaries="square", type_of_lattice="square"):
+    def __init__(self, number_of_rows_or_columns: int, shape_of_boundaries="square", type_of_lattice="square"):
         """Class constructor"""
         if type_of_lattice == "square":
             assert number_of_rows_or_columns % 2 != 0, "Square model needs to have an odd number of rows or columns to get a central node."
@@ -68,17 +68,70 @@ class Model:
 
         # save relevant quantities as attributes
         self.graph = graph
+        nodes_list = graph.nodes()
+        edges_list = graph.edges()
         self.nodes_list = graph.nodes()
         self.edges_list = graph.edges()
-        self.incidence_matrix = inc_mtx_dense_int
+        incidence_matrix = inc_mtx_dense_int
+        self.incidence_matrix = incidence_matrix
 
-
-    def __localise_source(self):
         """Compute source vector"""
-        pass
 
-    def __compute_physical_values(self):
-        pass
+        # how to assess source_value?
+        # should it be another argument in __init__ or just some derivative of number_of_rows_or_columns?
+        # source in the center of the square lattice -- eye retina model
+        # works only for odd number of rows/columns -- only then a central node exists
+        nodes_dim = graph.number_of_nodes()
+        source_value = (number_of_rows_or_columns-1)**2/ 2
+        if type_of_lattice == "square" and shape_of_boundaries == "square":
+            source_list = np.zeros(nodes_dim)
+            source_list[int((nodes_dim - 1) / 2)] = source_value  # source in the center
+            number_of_boundary_nodes = 4 * np.sqrt(nodes_dim) - 4
+            last_index = int(np.sqrt(nodes_dim) - 1)
+            iterator = 0
+            for node in graph.nodes:  # accessing nodes on the boundaries of the network
+                if node[0] == 0 or node[0] == last_index or node[1] == 0 or node[1] == last_index:
+                    source_list[iterator] = -source_value / number_of_boundary_nodes
+                iterator += 1
+        self.source_list = source_list
+
+
+        """Compute other physical values"""
+        # nodes-space vectors: source, pressure
+        # edges-space vectors: conductivity, length, flow, pressure difference
+        edges_dim = np.shape(incidence_matrix)[1]
+
+        incidence_T = incidence_matrix.transpose()
+        incidence_T_inv = np.linalg.pinv(incidence_T)
+        incidence_inv = np.linalg.pinv(incidence_matrix)
+
+        epsilon = 0.8
+        radii_list = np.ones(edges_dim) + np.random.default_rng().uniform(-epsilon, epsilon,
+                                                                          edges_dim)  # ones + stochastic noise
+        conductivity_list = 0.3 * np.float_power(radii_list, 4)
+        length_list = 0.8 * np.ones(edges_dim)
+
+        # Q = (delta^T)^-1 * S
+        flow_list = np.dot(source_list, incidence_T_inv)
+
+        # delta_p = K/L * Q
+        pressure_diff_list = flow_list * length_list * (1 / conductivity_list)
+        pressure_list = np.dot(pressure_diff_list, incidence_inv)
+
+        # x = delta^T * K/L *delta
+        x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
+        x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
+
+        # Q = K/L * delta * (delta^T * K/L * delta)^dagger * S
+        flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
+
+        # save to attributes
+        self.conductivity_list = conductivity_list
+        self.length_list = length_list
+        self.flow_list = flow_list
+        self.pressure_diff_list = pressure_diff_list
+        self.pressure_list = pressure_list
+        self.x = x
     """
     def __update_pandas_data(self):
         'Create and update pandas dataframes'
@@ -242,8 +295,8 @@ def generate_physical_values(source_list, incidence_matrix):
     edges_dim = np.shape(incidence_matrix)[1]
 
     incidence_T = incidence_matrix.transpose()
-    incidence_T_inv = jnp.linalg.pinv(incidence_T)
-    incidence_inv = jnp.linalg.pinv(incidence_matrix)
+    incidence_T_inv = np.linalg.pinv(incidence_T)
+    incidence_inv = np.linalg.pinv(incidence_matrix)
 
     epsilon = 0.8
     radii_list = np.ones(edges_dim) + np.random.default_rng().uniform(-epsilon, epsilon, edges_dim)  # ones + stochastic noise
@@ -260,7 +313,7 @@ def generate_physical_values(source_list, incidence_matrix):
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
     print(x)
-    x_dagger = jnp.linalg.pinv(x)  # Penrose pseudo-inverse
+    x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
     print('******************************')
     print(x_dagger)
     # Q = K/L * delta * (delta^T * K/L * delta)^dagger * S
@@ -497,7 +550,7 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
         conductivity_list += dK
 
         x = incidence_matrix @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
-        x_dagger = jnp.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
+        x_dagger = np.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
 
         # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
         flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
