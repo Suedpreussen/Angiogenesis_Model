@@ -13,13 +13,13 @@ start_time = time.time()
 '---------------object oriented approach---------------'
 # instantiate Model
 square_model = an.Model(7, 'square', 'square')
-square_model.graph()
+print(square_model.__dict__)
 
 
 '----------------functional approach------------------------'
 hexagonal = 0
 triangular = 0
-number_of_rowscols = 19
+number_of_rowscols = 3
 number_of_nodes = number_of_rowscols*number_of_rowscols
 incidence_matrix, graph, nodes_data, edges_data = an.generate_grid_graph(number_of_rowscols, number_of_rowscols, hexagonal=hexagonal, triangular=triangular)
 
