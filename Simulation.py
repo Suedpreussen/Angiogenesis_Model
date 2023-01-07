@@ -8,9 +8,8 @@ pr = profile.Profile()
 pr.enable()
 
 
-
 start_time = time.time()
-'---------------object oriented approach---------------'
+'---------------object oriented approach--------------------'
 # instantiate Model
 square_model = an.Model(7, 'square', 'square')
 print(square_model.__dict__)

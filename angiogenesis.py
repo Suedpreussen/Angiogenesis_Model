@@ -44,7 +44,6 @@ class Model:
 
 
         """Setting up lattice"""
-
         if type_of_lattice == "square":
             graph = nx.grid_graph(dim=(number_of_rows_or_columns, number_of_rows_or_columns))
         elif type_of_lattice == "triangular":
@@ -70,13 +69,13 @@ class Model:
         self.graph = graph
         nodes_list = graph.nodes()
         edges_list = graph.edges()
-        self.nodes_list = graph.nodes()
-        self.edges_list = graph.edges()
+        self.nodes_list = nodes_list
+        self.edges_list = edges_list
         incidence_matrix = inc_mtx_dense_int
         self.incidence_matrix = incidence_matrix
 
-        """Compute source vector"""
 
+        """Compute source vector"""
         # how to assess source_value?
         # should it be another argument in __init__ or just some derivative of number_of_rows_or_columns?
         # source in the center of the square lattice -- eye retina model
@@ -132,33 +131,38 @@ class Model:
         self.pressure_diff_list = pressure_diff_list
         self.pressure_list = pressure_list
         self.x = x
-    """
-    def __update_pandas_data(self):
-        'Create and update pandas dataframes'
+
+
+        "Create pandas dataframes"
         # creating data frames
         nodes_data = pd.DataFrame(nodes_list)
         edges_data = pd.DataFrame(edges_list)
-        if first_time:
-            if np.shape(nodes_data)[1] == 1:  # if nodes are indexing by one int
-                nodes_data.columns = ['nodes']
-                nodes_data['pressure'] = pressure_list
-                nodes_data['source'] = source_list
-            elif np.shape(nodes_data)[1] == 2:  # if nodes are indexing by two ints
-                nodes_data.columns = ['no-', '-des']
-                nodes_data['pressure'] = pressure_list
-                nodes_data['source'] = source_list
-            edges_data.columns = ['ed-', '-ges']
-            edges_data['conductivity'] = conductivity_list
-            edges_data['flow'] = np.abs(flow_list)
-            edges_data['press_diff'] = pressure_diff_list
-        # updating data frames
-        else:
-            edges_data['conductivity'] = conductivity_list
-            edges_data['flow'] = np.abs(flow_list)
-            edges_data['press_diff'] = pressure_diff_list
+
+        if np.shape(nodes_data)[1] == 1:  # if nodes are indexing by one int
+            nodes_data.columns = ['nodes']
             nodes_data['pressure'] = pressure_list
             nodes_data['source'] = source_list
-    """
+        elif np.shape(nodes_data)[1] == 2:  # if nodes are indexing by two ints
+            nodes_data.columns = ['no-', '-des']
+            nodes_data['pressure'] = pressure_list
+            nodes_data['source'] = source_list
+        edges_data.columns = ['ed-', '-ges']
+        edges_data['conductivity'] = conductivity_list
+        edges_data['flow'] = np.abs(flow_list)
+        edges_data['press_diff'] = pressure_diff_list
+
+        # save to attributes
+        self.nodes_data = nodes_data
+        self.edges_data = edges_data
+
+    def update_pandas_data(self):
+        # updating data frames
+        self.edges_data['conductivity'] = self.conductivity_list
+        self.edges_data['flow'] = np.abs(self.flow_list)
+        self.edges_data['press_diff'] = self.pressure_diff_list
+        self.nodes_data['pressure'] = self.pressure_list
+        self.nodes_data['source'] = self.source_list
+
     def __update_networkx_data(self):
         pass
 
