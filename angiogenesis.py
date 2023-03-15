@@ -244,10 +244,6 @@ class Model:
     def create_experiment_settings_log(self):
         pass
 
-    def draw_histogram(self):
-        pass
-
-
     def draw_graph(self, name: str, directory_name: str):
         max = 26
         cmap = plt.cm.magma_r
@@ -542,29 +538,7 @@ def energy_functional(conductivity_list, length_list, flow_list, gamma, show_res
         print("Constraint: ", constraint)
 
 
-def draw_histogram(directory_name, edges_data, file_name):
-    fig, ax = plt.subplots(1, 2)   #, figsize=(6.4, 4.8)
-    # titles
-    ax[0].set_title('Conductivity')
-    ax[1].set_title('Flow')
-    # draw histograms
-    ax[0].hist(edges_data['conductivity'], bins=40)
-    ax[1].hist(edges_data['flow'], bins=40)
-    plt.savefig(f'{directory_name}/{file_name}.png', dpi=300)
-    plt.clf()
 
-
-def draw_global_histogram(directory_name, list_of_dfs):
-    fig, ax = plt.subplots(1, 2)   #, figsize=(6.4, 4.8)
-    # titles
-    ax[0].set_title('Conductivity')
-    ax[1].set_title('Flow')
-    for df in list_of_dfs:
-        # draw histograms
-        ax[0].hist(df['conductivity'], bins=40)
-        ax[1].hist(df['flow'], bins=40)
-    plt.savefig(f"{directory_name}/global_histogram.png")
-    plt.clf()
 
 
 def draw_graph(directory_name, graph, name, conductivity_list, number_of_rowscols, triangular=False, hexagonal=False):
@@ -642,7 +616,7 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
     # draw graphs
     update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
     draw_graph(directory_name,graph, f"graph_at_0_{N}", conductivity_list, number_of_rowscols)
-    draw_histogram(directory_name, edges_data, f"histogram_0_{N}")
+
     # print log
     print(f"______n = 0________")
     print("Q_av: ", np.average(np.abs(flow_list)))
@@ -678,8 +652,6 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
             # draw graphs
             update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
             draw_graph(directory_name, graph, f"graph_at_{n}_{N}", conductivity_list, number_of_rowscols)
-            #list_of_dfs.append(edges_data)
-            draw_histogram(directory_name, edges_data, f"histogram_{n}_{N}")
             # print log
             print(f"________n = {n}________")
             print("Q_av: ", np.average(np.abs(flow_list)))
@@ -692,4 +664,4 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
     print('simulation time: ', round(t*b, 3), "1/(b')  =  ", round(t, 3), "seconds")
     update_df(source_list, pressure_list, conductivity_list, flow_list, pressure_diff_list, nodes_data, edges_data)
     checking_Kirchhoffs_and_Murrays_law(graph, source_list)
-    #draw_global_histogram(directory_name, list_of_dfs)
+

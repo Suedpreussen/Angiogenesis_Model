@@ -15,6 +15,9 @@ square_model = an.Model(33, 'square', 'square')
 print(square_model.__dict__)
 square_model.draw_graph("test", "graphs")
 
+
+
+
 print(f"time elapsed: {(time.time() - start_time):.4f}s")
 
 '----------------functional approach------------------------'
