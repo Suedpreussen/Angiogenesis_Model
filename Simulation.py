@@ -11,11 +11,12 @@ pr.enable()
 start_time = time.time()
 '---------------object oriented approach--------------------'
 # instantiate Model
-square_model = an.Model(33, 'square', 'square')
+square_model = an.Model(3, 'square', 'square')
 print(square_model.__dict__)
 square_model.draw_graph("test", "graphs")
 
-
+parameters_set = {'a': 3.1, 'b': 4.5, 'gamma': 2/3, 'delta': 2.01, 'nu': 1.1, 'c': 0.001, 'r': 2.2, 'dt': 0.01, 'N': 10}
+square_model.run_simulation("graphs", **parameters_set, is_scaled=True)
 
 
 print(f"time elapsed: {(time.time() - start_time):.4f}s")
