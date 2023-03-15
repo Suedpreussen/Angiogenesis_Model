@@ -15,6 +15,8 @@ create grid --> assign physical attributes --> run simulation and create visuali
 """
 TABLE OF CONTENT
 --------------------
+Model
+constructor:
 generate_grid_graph
 localise_source
 generate_physical_values
@@ -138,6 +140,7 @@ class Model:
         nodes_data = pd.DataFrame(nodes_list)
         edges_data = pd.DataFrame(edges_list)
 
+        # filling up the data frames
         if np.shape(nodes_data)[1] == 1:  # if nodes are indexing by one int
             nodes_data.columns = ['nodes']
             nodes_data['pressure'] = pressure_list
@@ -155,37 +158,142 @@ class Model:
         self.nodes_data = nodes_data
         self.edges_data = edges_data
 
+
     def update_pandas_data(self):
-        # updating data frames
         self.edges_data['conductivity'] = self.conductivity_list
         self.edges_data['flow'] = np.abs(self.flow_list)
         self.edges_data['press_diff'] = self.pressure_diff_list
         self.nodes_data['pressure'] = self.pressure_list
         self.nodes_data['source'] = self.source_list
 
+
     def __update_networkx_data(self):
+        # node_attrs = {tuple : dict, tuple: dic, ...} -- dict of (tuples as keys) and (dicts as values)
+        node_attrs = dict(self.graph.nodes)
+        iterator = 0
+        for key in node_attrs:
+            vals = {"pressure": self.pressure_list[iterator]}
+            node_attrs[key] = vals
+            iterator += 1
+        nx.set_node_attributes(self.graph, node_attrs)
+        # now for edges
+        edge_attrs = dict(self.graph.edges)
+        iterator = 0
+        for key in edge_attrs:
+            vals = {"conductivity": self.conductivity_list[iterator],
+                    "flow": self.flow_list[iterator], "pressure_diff": self.pressure_diff_list[iterator]}
+            edge_attrs[key] = vals
+            iterator += 1
+        nx.set_edge_attributes(self.graph, edge_attrs)
+
+
+    def check_kirchhoffs_and_murrays_law(self):
+        index = 0
+        successful_Kirchhoffs_nodes = 0
+        successful_Murrays_nodes = 0
+        alpha = 7 / 3
+        for node in self.graph.nodes(data=False):
+            flow_sum = 0
+            radii_in_sum = 0
+            radii_out_sum = 0
+            for edge in self.graph.edges(node):  # implementing direction of flow to the undirected graph
+                if np.sum(edge[0]) < np.sum(edge[1]):
+                    flow_sum += self.graph[edge[0]][edge[1]]['flow']
+                    radii_in_sum += np.float_power(self.graph[edge[0]][edge[1]]['conductivity'], -alpha / 4)
+                else:
+                    flow_sum -= self.graph[edge[0]][edge[1]]['flow']
+                    radii_out_sum -= np.float_power(self.graph[edge[0]][edge[1]]['conductivity'], -alpha / 4)
+
+            if -1e-11 < flow_sum - self.source_list[index] < 1e-11:  # checking for every node if the sum of inflows and ouflows yields zero
+                successful_Kirchhoffs_nodes += 1
+            else:
+                pass
+                print(flow_sum, '|', self.source_list[index], '|', print(node))
+                # print("Kirchhoff's law at node {} NOT fulfilled!".format(node), flow_sum + source_list[index])
+
+            if -1e-11 < np.abs(radii_in_sum - radii_out_sum) < 1e-11:  # checking M's law
+                successful_Murrays_nodes += 1
+            else:
+                pass
+                # print(np.abs(radii_in_sum - radii_out_sum) , '||', print(node))
+            index += 1
+
+        print("number of nodes fulfilling K's law:", successful_Kirchhoffs_nodes, 'out of', self.graph.number_of_nodes())
+        print("number of nodes fulfilling Murray's law:", successful_Murrays_nodes, 'out of', self.graph.number_of_nodes())
+
+        if successful_Kirchhoffs_nodes == self.graph.number_of_nodes():
+            print("SUCCESS! Kirchhoff's law fulfilled!")
+
+    def compute_energy_dissipation(self, gamma, show_result=False):
+        # calculating energy functional E = sum over edges L * Q^2 / K
+        energy_list = self.length_list * self.flow_list * self.flow_list / self.conductivity_list
+        energy = np.sum(energy_list)
+
+        # checking cost constraint = sum over edges L * K^(1/gamma - 1)
+        constraint = np.sum(self.length_list * np.float_power(self.conductivity_list, (1 / gamma - 1)))
+
+        if show_result:
+            print("Energy: ", energy)
+            print("Constraint: ", constraint)
+
+    def run_simulation(self, simulation_parameters):
+        """Main loop"""
+
         pass
 
-    def __check_kirchhoffs_law(self):
-        pass
-
-    def __compute_energy_dissipation(self):
+    def create_experiment_settings_log(self):
         pass
 
     def draw_histogram(self):
         pass
 
-    def draw_graph(self):
-        pass
+
+    def draw_graph(self, name: str, directory_name: str):
+        max = 26
+        cmap = plt.cm.magma_r
+        number_of_rowscols = self.__number_of_rows_or_columns
+        graph = self.graph
+        conductivity_list = self.conductivity_list
+
+        # setting the layout for the graph visualisation
+        if self.__type_of_lattice == "hexagonal":
+            pos = nx.get_node_attributes(graph, 'pos')  # hexagonal rigid layout
+        elif self.__type_of_lattice == "triangular":
+            pos = nx.get_node_attributes(graph, 'pos')  # triangular rigid layout
+        else:
+            pos = dict(
+                (number_of_rowscols, number_of_rowscols) for number_of_rowscols in graph.nodes())  # square rigid layout
+
+        # plot differently for different sizes of the network
+        if len(conductivity_list) < 100:
+            labels = nx.get_edge_attributes(graph, 'flow')
+            for key, val in labels.items():
+                new_val = round(val, 2)
+                labels[key] = new_val
+            nx.draw_networkx_edge_labels(graph, pos, edge_labels=labels, rotate=False, font_color='red')
+            nx.draw_networkx(graph, pos=pos, node_size=400 / (number_of_rowscols))
+            nx.draw_networkx_nodes(graph, pos=pos, node_size=400 / (number_of_rowscols))
+            nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 2)
+        elif 99 < len(conductivity_list) < 400:
+            nx.draw_networkx_nodes(graph, pos=pos, node_size=200 / (2 * number_of_rowscols))
+            nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 2, edge_color=conductivity_list, edge_cmap=cmap, edge_vmin=0, edge_vmax=max)
+        elif 399 < len(conductivity_list):
+            # nx.draw_networkx_nodes(graph, nodelist=(n-1, n-1), pos=pos, node_size=100 / (2 * n), node_color='black')
+            nc = nx.draw_networkx_edges(graph, pos=pos, width=np.float_power(conductivity_list, 1 / 4) * 1.5, edge_color=conductivity_list, edge_cmap=cmap, edge_vmin=0, edge_vmax=max)
+        plt.axis('off')
+        plt.axis('scaled')
+        plt.subplots_adjust(top=1, bottom=0, right=1, left=0, hspace=0, wspace=0)
+        plt.margins(0, 0)
+        plt.tight_layout(pad=0)
+        norm = mpl.colors.Normalize(vmin=0, vmax=max)
+        cax = plt.axes([0.85, 0.1, 0.075, 0.8])
+        plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax)
+        plt.savefig(f"{directory_name}/{name}.png", bbox_inches=0, dpi=300)
+        plt.clf()
+        # plt.show()
 
 
-class Simulation(Model):
-    def create_experiment_log(self):
-        pass
-
-    def run_simulation(self, simulation_parameters):
-        pass
-
+"""------------------------------------------------------------------------------------------------------------------"""
 
 
 def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangular=False):

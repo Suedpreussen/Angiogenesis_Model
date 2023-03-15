@@ -11,11 +11,14 @@ pr.enable()
 start_time = time.time()
 '---------------object oriented approach--------------------'
 # instantiate Model
-square_model = an.Model(7, 'square', 'square')
+square_model = an.Model(33, 'square', 'square')
 print(square_model.__dict__)
+square_model.draw_graph("test", "graphs")
 
+print(f"time elapsed: {(time.time() - start_time):.4f}s")
 
 '----------------functional approach------------------------'
+"""
 hexagonal = 0
 triangular = 0
 number_of_rowscols = 3
@@ -46,8 +49,7 @@ an.run_simulation("lattice_53x53_N=160", **arguments, **parameters_set, is_scale
 
 #print(edges_data)
 #print(nodes_data)
-
-print("time elapsed: {:.2f}s".format(time.time() - start_time))
+"""
 
 pr.disable()
 pr.dump_stats('profile3.pstat')
