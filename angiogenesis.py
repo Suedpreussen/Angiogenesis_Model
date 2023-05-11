@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import scipy
 import matplotlib as mpl
-import jaxlib
-import jax.numpy as jnp
 
 """
 General idea:
@@ -15,20 +13,20 @@ create grid --> assign physical attributes --> run simulation and create visuali
 """
 TABLE OF CONTENT
 --------------------
-Model
-constructor:
-generate_grid_graph
-localise_source
-generate_physical_values
-update_df
-set_graph_attributes
-update_graph_data
-checking_Kirchhoffs_and_Murrays_law
-draw_graph
-draw_histogram
-run_simulation
-
-unused code sent to Utils file
+class Model
+    def __init__
+        Set up lattice
+        Compute source vector
+        Compute other physical values
+        Create pandas dataframes
+    def update_pandas_data
+    def update_networkx_data
+    def check_Kirchhoffs_and_Murrays_law
+    def compute_energy_dissipation
+    def create_experiment_settings_log
+    def dump_data_to_database
+    def draw_graph
+    def run_simulation
 """
 
 
@@ -45,7 +43,7 @@ class Model:
         self.__type_of_lattice = type_of_lattice
 
 
-        """Setting up lattice"""
+        """Set up lattice"""
         if type_of_lattice == "square":
             graph = nx.grid_graph(dim=(number_of_rows_or_columns, number_of_rows_or_columns))
         elif type_of_lattice == "triangular":
@@ -161,7 +159,6 @@ class Model:
         self.nodes_data = nodes_data
         self.edges_data = edges_data
 
-
     def __update_pandas_data(self):
         self.edges_data['conductivity'] = self.conductivity_list
         self.edges_data['flow'] = np.abs(self.flow_list)
@@ -169,9 +166,8 @@ class Model:
         self.nodes_data['pressure'] = self.pressure_list
         self.nodes_data['source'] = self.source_list
 
-
     def __update_networkx_data(self):
-        # node_attrs = {tuple : dict, tuple: dic, ...} -- dict of (tuples as keys) and (dicts as values)
+        # node_attrs = {tuple : dict, tuple: dict, ...} -- dict of (tuples as keys) and (dicts as values)
         node_attrs = dict(self.graph.nodes)
         iterator = 0
         for key in node_attrs:
@@ -189,8 +185,7 @@ class Model:
             iterator += 1
         nx.set_edge_attributes(self.graph, edge_attrs)
 
-
-    def check_Kirchhoffs_and_Murrays_law(self):
+    def __check_kirchhoffs_and_murrays_law(self):
         index = 0
         successful_Kirchhoffs_nodes = 0
         successful_Murrays_nodes = 0
@@ -227,7 +222,7 @@ class Model:
         if successful_Kirchhoffs_nodes == self.graph.number_of_nodes():
             print("SUCCESS! Kirchhoff's law fulfilled!")
 
-    def compute_energy_dissipation(self, gamma, show_result=False):
+    def __compute_energy_dissipation(self, gamma, show_result=False):
         # calculating energy functional E = sum over edges L * Q^2 / K
         energy_list = self.length_list * self.flow_list * self.flow_list / self.conductivity_list
         energy = np.sum(energy_list)
@@ -239,124 +234,19 @@ class Model:
             print("Energy: ", energy)
             print("Constraint: ", constraint)
 
-    def run_simulation(self, directory_name: str, a, b, gamma, delta, nu, c, r, dt, N, is_scaled=False):
-        """Main part"""
-
-        # retrieving data from the object
-        graph = self.graph
-        source_list = self.source_list
-        source_value = self.source_value
-        pressure_list = self.pressure_list
-        length_list = self.length_list
-        conductivity_list = self.conductivity_list
-        flow_list = self.flow_list
-        pressure_diff_list = self.pressure_diff_list
-        nodes_data = self.nodes_data
-        edges_data = self.edges_data
-        number_of_rowscols = self.__number_of_rows_or_columns
-        incidence_matrix = self.incidence_matrix
-        incidence_T = self.incidence_T
-        incidence_inv = self.incidence_inv
-
-        flow_hat = np.average(np.abs(flow_list))
-        t = 0
-
-        self.__update_pandas_data()
-        self.__update_networkx_data()
-        self.check_Kirchhoffs_and_Murrays_law()
-
-        # two control parameters
-        rho = b / (r * gamma * delta)  # the ratio between the time scales for adaptation and growth
-        print("RHO: ", rho)
-
-        source_hat = source_value
-        kappa = (c / a) * np.float_power((flow_hat / source_hat), 2 * gamma)  # a/c is the ratio between background growth rate and adaptation strength and the hatted quantities are typical scales for flow and source strength.
-        print("KAPPA: ", kappa)
-
-        # implementing scaling factors
-        if is_scaled:
-            source_list = source_list * np.exp(r * t * delta / 2)
-            pressure_list = pressure_list * np.exp(r * t * nu / 2)
-            length_list = length_list * np.exp(r * t / 2)
-            conductivity_list = conductivity_list * np.exp(r * t * delta * gamma)
-            flow_list = flow_list * np.exp(r * t * delta / 2)
-            b = b + r * gamma * delta
-            c = c * np.exp(-r * t * gamma * delta)
-            print("time unit: ", 1 / b)
-
-        lagrange_multiplier = 0.01
-        flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier) * np.sqrt(1 / gamma + 1) * np.float_power(
-            conductivity_list, 1 / (2 * gamma))
-
-        # snapshot before the sim
-        # draw graphs
-        self.__update_pandas_data()
-        self.draw_graph(f"graph_at_0_{N}", "graphs")
-
-
-        # print log
-        print(f"______n = 0________")
-        print("Q_av: ", np.average(np.abs(flow_list)))
-        self.compute_energy_dissipation(gamma, show_result=True)
-        print("Sum of conductivity: ", np.sum(conductivity_list))
-
-        # list_of_dfs = []                     # container to store dfs at snapshots
-        # list_of_dfs.append(edges_data)
-
-        # MAIN LOOP
-        for n in range(1, N + 1):
-            t += dt
-
-            # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
-            dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat),
-                                      (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
-            # dK = dt * (np.float_power(a * (np.abs(flow_from_lagrange_optimisation) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
-            conductivity_list += dK
-
-            x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
-            x_dagger = np.linalg.pinv(
-                incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
-
-            # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
-            flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(
-                1 / length_list)
-            pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
-            pressure_list = np.dot(pressure_diff_list, incidence_inv)
-            self.compute_energy_dissipation(gamma)
-
-            # updating data in graph dics
-            self.__update_networkx_data()
-
-            # sim snapshots
-            if n == N or n == N / 16 or n == (2 * N) / 16 or n == (3 * N) / 16 or n == N / 4 or n == N / 2 or n == (
-                    3 * N) / 4 or n == N / 32 or n == (2 * N) / 32 or n == (3 * N) / N:
-                # draw graphs
-                self.__update_pandas_data()
-                self.draw_graph(f"graph_at_0_{N}", "graphs")
-                # print log
-                print(f"________n = {n}________")
-                print("Q_av: ", np.average(np.abs(flow_list)))
-                self.compute_energy_dissipation(gamma, show_result=True)
-                print("Sum of conductivity: ", np.sum(conductivity_list))
-
-            # dEdF_lam_dgdF = np.sum(flow_list) / np.sum(conductivity_list)    # checking first eq from lagrange optimisation
-            # print(dEdF_lam_dgdF)
-
-        print('simulation time: ', round(t * b, 3), "1/(b')  =  ", round(t, 3), "seconds")
-        self.__update_pandas_data()
-        self.check_Kirchhoffs_and_Murrays_law()
-
-
-
     def create_experiment_settings_log(self):
         pass
 
+    def dump_data_to_database(self):
+        pass
+
     def draw_graph(self, name: str, directory_name: str):
-        max = 26
-        cmap = plt.cm.magma_r
         number_of_rowscols = self.__number_of_rows_or_columns
         graph = self.graph
         conductivity_list = self.conductivity_list
+
+        max = 26  # max value on the colour map bar
+        cmap = plt.cm.magma_r
 
         # setting the layout for the graph visualisation
         if self.__type_of_lattice == "hexagonal":
@@ -395,8 +285,111 @@ class Model:
         plt.clf()
         # plt.show()
 
+    def run_simulation(self, directory_name: str, a, b, gamma, delta, nu, c, r, dt, N, is_scaled=False, create_log=False, dump_data=False, create_graphs=False):
+        """Main part"""
 
-"""------------------------------------------------------------------------------------------------------------------"""
+        # retrieving data from the object
+        graph = self.graph
+        source_list = self.source_list
+        source_value = self.source_value
+        pressure_list = self.pressure_list
+        length_list = self.length_list
+        conductivity_list = self.conductivity_list
+        flow_list = self.flow_list
+        pressure_diff_list = self.pressure_diff_list
+        nodes_data = self.nodes_data
+        edges_data = self.edges_data
+        number_of_rowscols = self.__number_of_rows_or_columns
+        incidence_matrix = self.incidence_matrix
+        incidence_T = self.incidence_T
+        incidence_inv = self.incidence_inv
+
+        flow_hat = np.average(np.abs(flow_list))
+        t = 0
+
+        self.__update_pandas_data()
+        self.__update_networkx_data()
+        self.__check_kirchhoffs_and_murrays_law()
+
+        # two control parameters
+        rho = b / (r * gamma * delta)  # the ratio between the time scales for adaptation and growth
+        print("RHO: ", rho)
+
+        source_hat = source_value
+        kappa = (c / a) * np.float_power((flow_hat / source_hat), 2 * gamma)  # a/c is the ratio between background growth rate and adaptation strength and the hatted quantities are typical scales for flow and source strength.
+        print("KAPPA: ", kappa)
+
+        # implementing scaling factors
+        if is_scaled:
+            source_list = source_list * np.exp(r * t * delta / 2)
+            pressure_list = pressure_list * np.exp(r * t * nu / 2)
+            length_list = length_list * np.exp(r * t / 2)
+            conductivity_list = conductivity_list * np.exp(r * t * delta * gamma)
+            flow_list = flow_list * np.exp(r * t * delta / 2)
+            b = b + r * gamma * delta
+            c = c * np.exp(-r * t * gamma * delta)
+            print("time unit: ", 1 / b)
+
+        #lagrange_multiplier = 0.01
+        #flow_from_lagrange_optimisation = np.sqrt(lagrange_multiplier) * np.sqrt(1 / gamma + 1) * np.float_power(conductivity_list, 1 / (2 * gamma))
+
+        # snapshot before the sim
+        # draw graphs
+        self.__update_pandas_data()
+        self.draw_graph(f"graph_at_0_{N}", "graphs")
+
+
+        # print log
+        print(f"______n = 0________")
+        print("Q_av: ", np.average(np.abs(flow_list)))
+        self.__compute_energy_dissipation(gamma, show_result=True)
+        print("Sum of conductivity: ", np.sum(conductivity_list))
+
+        # list_of_dfs = []                     # container to store dfs at snapshots
+        # list_of_dfs.append(edges_data)
+
+        # MAIN LOOP
+        for n in range(1, N + 1):
+            t += dt
+
+            # dK/dt = a*(q / q_hat)^(2*gamma) - b * K + c
+            dK = dt * (np.float_power(a * (np.abs(flow_list) / flow_hat),
+                                      (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+            # dK = dt * (np.float_power(a * (np.abs(flow_from_lagrange_optimisation) / flow_hat), (2 * gamma)) - b * conductivity_list + c * np.ones(len(flow_list)))
+            conductivity_list += dK
+
+            x = incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T
+            x_dagger = np.linalg.pinv(incidence_matrix @ np.diag(1 / length_list) @ np.diag(conductivity_list) @ incidence_T)
+
+            # q = K/L * delta * (delta^T * K/L * delta)^dagger * S
+            flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
+            pressure_diff_list = length_list * (1 / conductivity_list) * flow_list
+            pressure_list = np.dot(pressure_diff_list, incidence_inv)
+            self.__compute_energy_dissipation(gamma)
+
+            # updating data in graph dicts
+            self.__update_networkx_data()
+
+            # sim snapshots
+            if n == N or n == N / 16 or n == (2 * N) / 16 or n == (3 * N) / 16 or n == N / 4 or n == N / 2 or n == (3 * N) / 4 or n == N / 32 or n == (2 * N) / 32 or n == (3 * N) / N:
+                # draw graphs
+                self.__update_pandas_data()
+                self.draw_graph(f"graph_at_{n}_{N}", "graphs")
+                # print log
+                print(f"________n = {n}________")
+                print("Q_av: ", np.average(np.abs(flow_list)))
+                self.__compute_energy_dissipation(gamma, show_result=True)
+                print("Sum of conductivity: ", np.sum(conductivity_list))
+
+            # dEdF_lam_dgdF = np.sum(flow_list) / np.sum(conductivity_list)    # checking first eq from lagrange optimisation
+            # print(dEdF_lam_dgdF)
+
+        print('simulation time: ', round(t * b, 3), "1/(b')  =  ", round(t, 3), "seconds")
+        self.__update_pandas_data()
+        self.__check_kirchhoffs_and_murrays_law()
+
+
+"""---------------------------------functional version below---------------------------------------------------------"""
 
 
 def generate_grid_graph(dim_A, dim_B, periodic=False, hexagonal=False, triangular=False):
@@ -527,10 +520,10 @@ def generate_physical_values(source_list, incidence_matrix):
 
     # x = delta^T * K/L *delta
     x = incidence_matrix  @ np.diag(1/length_list) @ np.diag(conductivity_list) @ incidence_T
-    print(x)
+    #print(x)
     x_dagger = np.linalg.pinv(x)  # Penrose pseudo-inverse
-    print('******************************')
-    print(x_dagger)
+    #print('******************************')
+    #print(x_dagger)
     # Q = K/L * delta * (delta^T * K/L * delta)^dagger * S
     flow_list = source_list @ x_dagger @ incidence_matrix @ np.diag(conductivity_list) @ np.diag(1 / length_list)
 
@@ -751,7 +744,7 @@ def run_simulation(directory_name, source_value, number_of_rowscols, nodes_data,
         pressure_list = np.dot(pressure_diff_list, incidence_inv)
         energy_functional(conductivity_list, length_list, flow_list, gamma)
 
-        # updating data in graph dics
+        # updating data in graph dicts
         set_graph_attributes(graph, pressure_list, conductivity_list, flow_list, pressure_diff_list)
 
         # sim snapshots
